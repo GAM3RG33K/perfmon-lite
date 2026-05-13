@@ -128,6 +128,8 @@ jobs:
           emulator-options: -no-snapshot -no-window -no-audio -gpu auto -memory 2048
           disable-animations: true
           script: |
+            echo "=== Ensuring ADB is executable ==="
+            chmod +x "$(command -v adb)" 2>/dev/null || sudo chmod +x /usr/local/lib/android/sdk/platform-tools/adb
             echo "=== Emulator ready ==="
             adb devices -l
             cd ${{ github.workspace }}
