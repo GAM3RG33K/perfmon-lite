@@ -47,6 +47,7 @@ jobs:
           name: perfmon-linux-amd64
           path: perfmon
           retention-days: 7
+          overwrite: true
 
   # ─── Cross-platform Build ─────────────────────────────────────────────
   cross-build:
@@ -86,6 +87,7 @@ jobs:
           name: perfmon-${{ matrix.goos }}-${{ matrix.goarch }}
           path: perfmon-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
           retention-days: 7
+          overwrite: true
 
   # ─── ADB Integration Tests (Android emulator) ─────────────────────────
   adb-integration:
