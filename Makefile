@@ -1,8 +1,9 @@
-.PHONY: build run mock test lint clean help
+.PHONY: build cross-build run mock test test-short test-adb lint fmt clean tidy dev all release
 
 APP_NAME := perfmon
 GO_FLAGS := -ldflags="-s -w"
 COVERAGE_FILE := coverage.out
+DIST_DIR := dist
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -10,6 +11,25 @@ help: ## Show this help
 
 build: ## Build the binary
 	go build -o $(APP_NAME) $(GO_FLAGS) ./cmd/perfmon/
+
+cross-build: ## Build binaries for all platforms (linux/darwin/windows × amd64/arm64)
+	@mkdir -p $(DIST_DIR)
+	@echo "=== Cross-platform build ==="
+	@for goos in linux darwin windows; do \
+	  for goarch in amd64 arm64; do \
+	    if [ "$$goos" = "windows" ] && [ "$$goarch" = "arm64" ]; then continue; fi; \
+	    ext=""; \
+	    if [ "$$goos" = "windows" ]; then ext=".exe"; fi; \
+	    out="$(DIST_DIR)/$(APP_NAME)-$$goos-$$goarch$$ext"; \
+	    echo "  building $$goos/$$goarch → $$out"; \
+	    GOOS=$$goos GOARCH=$$goarch go build -o $$out $(GO_FLAGS) ./cmd/perfmon/; \
+	    ls -lh "$$out" | awk '{print "    " $$5}'; \
+	  done; \
+	done
+	@echo "=== Done — $(DIST_DIR)/ contents ==="
+	@ls -lh $(DIST_DIR)/
+
+release: cross-build ## Alias for cross-build
 
 run: ## Run without mock mode
 	go run ./cmd/perfmon/
@@ -36,7 +56,7 @@ fmt: ## Format all Go code
 clean: ## Remove build artifacts
 	rm -f $(APP_NAME)
 	rm -f $(COVERAGE_FILE)
-	rm -rf dist/ build/ release/
+	rm -rf $(DIST_DIR)/ build/ release/
 
 tidy: ## Tidy Go modules
 	go mod tidy
