@@ -119,6 +119,41 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           ls -la /dev/kvm
 
+      # Pin the Android SDK root to the pre-installed location so the emulator
+      # action uses the existing SDK instead of downloading fresh copies via
+      # sdkmanager (which may extract platform-tools without +x permissions).
+      - name: Configure Android SDK
+        run: |
+          SDK_ROOT="/usr/local/lib/android/sdk"
+          if [ -d "$SDK_ROOT" ]; then
+            echo "ANDROID_HOME=$SDK_ROOT" >> $GITHUB_ENV
+            echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> $GITHUB_ENV
+            echo "Android SDK found at $SDK_ROOT"
+          else
+            echo "Pre-installed SDK not found, will use action default"
+          fi
+
+      - name: Ensure ADB is executable
+        run: |
+          ADB_PATH="/usr/local/lib/android/sdk/platform-tools/adb"
+          if [ -x "$ADB_PATH" ]; then
+            echo "ADB already executable at $ADB_PATH"
+          elif [ -f "$ADB_PATH" ]; then
+            echo "ADB exists but not executable — fixing permissions"
+            sudo chmod +x "$ADB_PATH"
+            echo "Permissions fixed"
+          else
+            echo "ADB not at expected path, searching..."
+            FOUND_ADB=$(find /usr/local/lib /opt -name adb -type f 2>/dev/null | head -1)
+            if [ -n "$FOUND_ADB" ]; then
+              echo "Found ADB at $FOUND_ADB"
+              sudo chmod +x "$FOUND_ADB"
+            else
+              echo "ADB binary not found — will be installed by emulator runner"
+            fi
+          fi
+          command -v adb && adb --version || echo "adb not in PATH yet"
+
       - name: ADB Integration Tests (with emulator)
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -128,8 +163,6 @@ jobs:
           emulator-options: -no-snapshot -no-window -no-audio -gpu auto -memory 2048
           disable-animations: true
           script: |
-            echo "=== Ensuring ADB is executable ==="
-            chmod +x "$(command -v adb)" 2>/dev/null || sudo chmod +x /usr/local/lib/android/sdk/platform-tools/adb
             echo "=== Emulator ready ==="
             adb devices -l
             cd ${{ github.workspace }}
