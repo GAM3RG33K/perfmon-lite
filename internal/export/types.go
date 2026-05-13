@@ -49,6 +49,10 @@ type ExportMetadata struct {
 
 // BuildExportData assembles an ExportData from engine snapshots and metadata.
 func BuildExportData(snapshots []engine.TelemetrySnapshot, opts Options) ExportData {
+	telemetry := snapshots
+	if telemetry == nil {
+		telemetry = []engine.TelemetrySnapshot{}
+	}
 	return ExportData{
 		Schema: fmt.Sprintf("https://perfmon.qzz.io/schemas/export-v1.json"),
 		Metadata: ExportMetadata{
@@ -60,7 +64,7 @@ func BuildExportData(snapshots []engine.TelemetrySnapshot, opts Options) ExportD
 			BuildType:      opts.BuildType,
 		},
 		Summary:   engine.ComputeMetricsSummary(snapshots),
-		Telemetry: snapshots,
+		Telemetry: telemetry,
 	}
 }
 

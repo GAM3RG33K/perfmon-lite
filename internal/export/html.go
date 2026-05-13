@@ -318,7 +318,12 @@ func buildSVGLinePoints(snapshots []engine.TelemetrySnapshot, width, height int,
 	}
 
 	n := len(snapshots)
-	step := float64(width) / float64(n-1)
+	var step float64
+	if n == 1 {
+		step = 0
+	} else {
+		step = float64(width) / float64(n-1)
+	}
 	rangeY := dataMax - dataMin
 	if rangeY == 0 {
 		rangeY = 1
@@ -383,7 +388,7 @@ func buildASCIISparkline(snapshots []engine.TelemetrySnapshot, valueFn func(engi
 		if barHeight >= height {
 			barHeight = height - 1
 		}
-		for row := height - 1; row >= height-1-barHeight; row-- {
+		for row := height - 1; row > height-1-barHeight; row-- {
 			canvas[row][i] = '█'
 		}
 	}

@@ -166,4 +166,4 @@ jobs:
             echo "=== Emulator ready ==="
             adb devices -l
             cd ${{ github.workspace }}
-            go test -tags=adb_test -v -race -count=1 ./internal/platform/android/
+            go test -tags=adb_test -v -race -count=1 -timeout 300s ./internal/platform/android/
