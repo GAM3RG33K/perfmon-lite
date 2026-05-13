@@ -7,9 +7,6 @@
 /perfmon
 /perfmon.exe
 
-# Source directories
-!cmd/perfmon/
-
 # Test binary, built with `go test -c`
 *.test
 
