@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/w1n/perfmon/internal/engine"
+	"github.com/w1n/perfmon/internal/export"
 	"github.com/w1n/perfmon/internal/tui/styles"
 	"github.com/w1n/perfmon/internal/tui/views"
 )
@@ -41,6 +42,9 @@ type Model struct {
 	TargetSelector *views.TargetSelectorView
 	Logs           *views.LogsView
 
+	// Runtime state
+	Platform engine.Platform
+
 	// Layout
 	Width  int
 	Height int
@@ -52,7 +56,7 @@ type Model struct {
 }
 
 // NewModel creates a new TUI model.
-func NewModel(eng *engine.Engine, mock bool) *Model {
+func NewModel(eng *engine.Engine, mock bool, platform engine.Platform) *Model {
 	return &Model{
 		Engine:         eng,
 		Mock:           mock,
@@ -62,6 +66,7 @@ func NewModel(eng *engine.Engine, mock bool) *Model {
 		Logs:           views.NewLogsView(1000),
 		Width:          80,
 		Height:         24,
+		Platform:       platform,
 	}
 }
 
@@ -164,7 +169,28 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.Logs.AddEntry("INFO", "Refreshing...")
 
 	case "e":
-		m.Logs.AddEntry("INFO", "Export triggered — press 'e' in a future build")
+		path, err := m.exportCurrentData(export.FormatJSON)
+		if err != nil {
+			m.Logs.AddEntry("ERROR", fmt.Sprintf("Export failed: %v", err))
+		} else {
+			m.Logs.AddEntry("INFO", fmt.Sprintf("Exported to %s", path))
+		}
+
+	case "E": // Shift+E for Markdown
+		path, err := m.exportCurrentData(export.FormatMD)
+		if err != nil {
+			m.Logs.AddEntry("ERROR", fmt.Sprintf("Export failed: %v", err))
+		} else {
+			m.Logs.AddEntry("INFO", fmt.Sprintf("Exported to %s", path))
+		}
+
+	case "ctrl+e": // Ctrl+E for HTML
+		path, err := m.exportCurrentData(export.FormatHTML)
+		if err != nil {
+			m.Logs.AddEntry("ERROR", fmt.Sprintf("Export failed: %v", err))
+		} else {
+			m.Logs.AddEntry("INFO", fmt.Sprintf("Exported to %s", path))
+		}
 
 	case "?":
 		m.Logs.AddEntry("INFO", "Help: [TAB] Switch Tabs  [↑/↓] Navigate  [Enter] Select  [e] Export  [r] Refresh  [q] Quit")
@@ -305,6 +331,51 @@ func (m *Model) renderFooter() string {
 		footerWidth = 20
 	}
 	return styles.FooterStyle.Width(footerWidth).Render(strings.Join(hints, "  "))
+}
+
+// exportCurrentData exports the current ring buffer to the given format.
+func (m *Model) exportCurrentData(formatType export.Format) (string, error) {
+	snapshots := m.Engine.Buffer.GetAll()
+	if len(snapshots) == 0 {
+		return "", fmt.Errorf("no telemetry data to export")
+	}
+
+	// Gather metadata from the model state
+	deviceName := "unknown"
+	if len(m.TargetSelector.Devices) > 0 {
+		deviceName = m.TargetSelector.Devices[0].Name
+	}
+
+	appName := "unknown"
+	buildType := engine.BuildUnknown
+	platform := m.Platform
+	if len(m.TargetSelector.Processes) > 0 {
+		appName = m.TargetSelector.Processes[0].PackageName
+		buildType = m.TargetSelector.Processes[0].BuildType
+	}
+
+	opts := export.Options{
+		Format:     formatType,
+		OutputPath: "", // empty = auto-generate filename
+		Version:    "1.0.0",
+		Platform:   platform,
+		DeviceName: deviceName,
+		AppName:    appName,
+		BuildType:  buildType,
+	}
+
+	// Resolve path and ensure directory
+	opts.OutputPath = export.ResolveOutputPath(opts, snapshots)
+	if err := export.EnsureOutputDir(opts.OutputPath); err != nil {
+		return "", fmt.Errorf("creating output directory: %w", err)
+	}
+
+	path, err := export.Export(snapshots, opts)
+	if err != nil {
+		return "", fmt.Errorf("export: %w", err)
+	}
+
+	return path, nil
 }
 
 // SetTargets populates the device and process data into the TUI views.

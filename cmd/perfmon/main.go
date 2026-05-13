@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/w1n/perfmon/internal/engine"
+	"github.com/w1n/perfmon/internal/export"
 	"github.com/w1n/perfmon/internal/platform/android"
 	iosPkg "github.com/w1n/perfmon/internal/platform/ios"
 	"github.com/w1n/perfmon/internal/platform/mock"
@@ -133,8 +134,61 @@ func main() {
 			time.Sleep(time.Duration(*intervalFlag) * time.Second / 10)
 		}
 
-		fmt.Printf("Exporting to %s format at %s...\n", *exportFlag, *outputFlag)
-		fmt.Println("Export subsystem coming in Phase 4.")
+		snapshots := eng.Buffer.GetAll()
+		if len(snapshots) == 0 {
+			fmt.Println("No telemetry data collected — exiting.")
+			os.Exit(1)
+		}
+
+		deviceName := "unknown"
+		if len(discoveredDevices) > 0 {
+			deviceName = discoveredDevices[0].Name
+		}
+		appName := "unknown"
+		buildType := engine.BuildUnknown
+		if len(discoveredProcesses) > 0 {
+			appName = discoveredProcesses[0].PackageName
+			buildType = discoveredProcesses[0].BuildType
+		}
+
+		var format export.Format
+		switch *exportFlag {
+		case "json":
+			format = export.FormatJSON
+		case "md", "markdown":
+			format = export.FormatMD
+		case "html":
+			format = export.FormatHTML
+		case "pdf":
+			format = export.FormatPDF
+		default:
+			fmt.Fprintf(os.Stderr, "Unsupported export format: %s (supported: json, md, html, pdf)\n", *exportFlag)
+			os.Exit(1)
+		}
+
+		opts := export.Options{
+			Format:     format,
+			OutputPath: *outputFlag,
+			Version:    version,
+			Platform:   targetPlatform,
+			DeviceName: deviceName,
+			AppName:    appName,
+			BuildType:  buildType,
+		}
+
+		if err := export.EnsureOutputDir(opts.OutputPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to create output directory: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Exporting %d data points to %s format...\n", len(snapshots), *exportFlag)
+		path, err := export.Export(snapshots, opts)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Export failed: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Report written to: %s\n", path)
 		os.Exit(0)
 	}
 
@@ -142,7 +196,7 @@ func main() {
 	// Interactive TUI Mode
 	// ══════════════════════════════════════════════════════════════════════
 
-	model := perfmonTui.NewModel(eng, *mockMode)
+	model := perfmonTui.NewModel(eng, *mockMode, targetPlatform)
 
 	// Populate the TUI with discovered devices and processes
 	model.SetTargets(discoveredDevices, discoveredProcesses)
