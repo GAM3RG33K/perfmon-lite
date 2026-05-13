@@ -4,8 +4,11 @@
 *.dll
 *.so
 *.dylib
-perfmon
-perfmon.exe
+/perfmon
+/perfmon.exe
+
+# Source directories
+!cmd/perfmon/
 
 # Test binary, built with `go test -c`
 *.test
