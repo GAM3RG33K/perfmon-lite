@@ -160,7 +160,7 @@ Where $t$ is Timestamp, $C$ is CPU percentage, $M$ is Memory allocated, and $T$ 
 
 ```json
 {
-  "$schema": "https://perfmon.dev/schemas/export-v1.json",
+  "$schema": "https://perfmon.qzz.io/schemas/export-v1.json",
   "metadata": {
     "generated_at": "2026-05-13T16:19:38Z",
     "perfmon_version": "1.0.0",
