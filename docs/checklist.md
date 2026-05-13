@@ -63,22 +63,29 @@
 
 ## Phase 3: iOS Subsystem
 
-- [ ] `internal/platform/ios/discovery.go` — `xcrun simctl list` parser
-- [ ] `internal/platform/ios/process.go` — Bundle ID/PID resolution
-- [ ] `internal/platform/ios/telemetry.go` — Metric polling
-- [ ] `internal/platform/ios/buildinfo.go` — Debug/Release detection
-- [ ] End-to-end: select iOS simulator → see live telemetry in TUI
+- [x] `internal/platform/ios/discovery.go` — `xcrun simctl list` + `devicectl list` parser
+- [x] `internal/platform/ios/process.go` — Bundle ID/PID resolution via launchctl list / ps
+- [x] `internal/platform/ios/telemetry.go` — Metric polling via top / ps fallback
+- [x] `internal/platform/ios/buildinfo.go` — Debug/Release detection via entitlements
+- [x] `internal/platform/ios/preflight.go` — xcrun path detection, version check, xcode-select
+- [x] `internal/platform/ios/provider.go` — iOSProvider struct with interface compliance
+- [x] Wire into main.go: auto-detect Android → iOS fallback on macOS; `--ios` flag
+- [x] End-to-end: select iOS simulator → see live telemetry in TUI
 
 ---
 
 ## Phase 4: Export Subsystem
 
-- [ ] `internal/export/generator.go` — Format selection + file writing
-- [ ] `internal/export/templates/export.json` — JSON export
-- [ ] `internal/export/templates/export.md` — Markdown export
-- [ ] `internal/export/templates/export.html` — HTML export with inline CSS
-- [ ] PDF export with `go-pdf/gopdf`
-- [ ] Static assets embedded via `//go:embed`
+- [x] `internal/export/types.go` — ExportData, Options, BuildExportData
+- [x] `internal/export/export.go` — Format dispatcher + path resolution
+- [x] `internal/export/json.go` — JSON export (PRD schema v1)
+- [x] `internal/export/markdown.go` — Markdown report with ASCII sparklines + tables
+- [x] `internal/export/html.go` — HTML export with SVG vector charts + embedded CSS
+- [x] `internal/export/pdf.go` — PDF export with vector line graphs (go-pdf/fpdf)
+- [x] `internal/export/templates/style.css` — Dark-theme CSS (`//go:embed`)
+- [x] `internal/export/export_test.go` — 35 unit tests covering all formats
+- [x] TUI keybindings: `e` → JSON, `Shift+E` → Markdown, `Ctrl+E` → HTML
+- [x] CLI `--export` flag for non-interactive export mode
 
 ---
 
@@ -102,10 +109,10 @@
 
 | Phase | Total Tasks | Done | % |
 |-------|-------------|------|---|
-| 0: Scaffolding | 7 | 5 | 71% |
+| 0: Scaffolding | 7 | 7 | 100% |
 | 1: Engine + TUI | 12 | 12 | 100% |
-| 2: Android | 9 | 8 | 89% |
-| 3: iOS | 4 | 0 | 0% |
-| 4: Export | 6 | 0 | 0% |
-| 5: Polish | 10 | 4 | 40% |
-| **Total** | **48** | **29** | **60%** |
+| 2: Android | 9 | 9 | 100% |
+| 3: iOS | 8 | 8 | 100% |
+| 4: Export | 10 | 10 | 100% |
+| 5: Polish | 10 | 5 | 50% |
+| **Total** | **56** | **51** | **91%** |

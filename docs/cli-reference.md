@@ -21,10 +21,12 @@ A blistering-fast, standalone, terminal-based mobile app profiler that provides 
 | Flag | Shorthand | Type | Default | Description |
 |------|-----------|------|---------|-------------|
 | `--mock` | | | `false` | Run with simulated telemetry data (no device required). Useful for UI development and demos |
+| `--ios` | | | `false` | Force iOS mode (use xcrun instead of ADB auto-detection) |
 | `--target` | `-t` | `string` | `""` | Specify target device/app (e.g., `emulator-5554`, `Pixel8`, `com.example.app`) |
 | `--interval` | `-i` | `int` | `1` | Polling interval in seconds. Range: 1-60 |
 | `--output` | `-o` | `string` | `"./perfmon_export"` | Output path for export file (without extension) |
 | `--buffer` | `-b` | `int` | `300` | Ring buffer capacity (number of data points kept in memory) |
+| `--export` | | `string` | `""` | Export format for non-interactive mode: `json`, `md`, `html`, `pdf` |
 | `--verbose` | `-V` | | `false` | Enable verbose logging to stderr |
 | `--help` | `-h` | | `false` | Show help message and exit |
 | `--version` | `-v` | | `false` | Show version information and exit |
@@ -71,35 +73,52 @@ perfmon devices [flags]
 
 ---
 
-### 3.2 `perfmon export`
+### 3.2 `perfmon export` / `--export`
 
-Export the most recently captured telemetry buffer to a file.
+Export telemetry data to a file. Supports two modes:
 
+**Non-interactive CLI mode:**
 ```
-perfmon export <format> [flags]
+perfmon [--mock] --export <format> [--output <path>]
 ```
+This samples 10 data points (with simulated polling) and writes the report.
+
+**Interactive TUI mode:**
+Press `e` (JSON), `Shift+E` (Markdown), or `Ctrl+E` (HTML) during a live session.
 
 **Arguments:**
 
 | Argument | Description |
 |----------|-------------|
-| `format` | Export format: `json`, `md`, `html`, `pdf` |
+| `format` | Export format: `json`, `md`|`markdown`, `html`, `pdf` |
 
 **Flags:**
 
 | Flag | Shorthand | Default | Description |
 |------|-----------|---------|-------------|
 | `--output` | `-o` | `"./perfmon_export"` | Output path (extension auto-appended) |
-| `--pretty` | | `true` | Pretty-print JSON output |
 
 **Examples:**
 
 ```bash
-perfmon export json
-perfmon export md --output ./reports/session-001
-perfmon export html --output ./reports/perf-report
-perfmon export pdf --output ./reports/perf-graph
+# Non-interactive export (CLI mode)
+perfmon --mock --export json
+perfmon --mock --export md --output ./reports/session-001
+perfmon --mock --export html --output ./reports/perf-report
+perfmon --export pdf --target emulator-5554
+
+# Interactive mode (press e/E/Ctrl+E inside TUI)
+perfmon
 ```
+
+**Generated files:**
+
+| Format | File | Contents |
+|--------|------|----------|
+| `json` | `<output>.json` | Structured data matching PRD schema v1: metadata, metrics_summary, telemetry array |
+| `md` | `<output>.md` | Human-readable Markdown report with summary table, telemetry table, ASCII sparklines |
+| `html` | `<output>.html` | Standalone HTML with dark theme CSS, SVG vector charts for CPU/Memory/Threads |
+| `pdf` | `<output>.pdf` | Native PDF with vector line charts on multiple pages (via `go-pdf/fpdf`) |
 
 **JSON Schema:** The JSON export conforms to `https://perfmon.qzz.io/schemas/export-v1.json`. See `docs/architecture.md` §6 for the full schema specification, including `metadata`, `metrics_summary`, and `telemetry` arrays.
 

@@ -58,10 +58,11 @@
 
 | #  | Task | Status |
 |----|------|--------|
-| 3.1 | `internal/platform/ios/discovery.go` — Parse `xcrun simctl list` for simulator device discovery | ❌ |
-| 3.2 | `internal/platform/ios/process.go` — Resolve bundle IDs and PIDs on booted simulators | ❌ |
-| 3.3 | `internal/platform/ios/telemetry.go` — Poll metrics via `xcrun simctl` / `instruments` / `devicectl` | ❌ |
-| 3.4 | `internal/platform/ios/buildinfo.go` — Detect debug/release from `.app` entitlements or Info.plist | ❌ |
+| 3.1 | `internal/platform/ios/discovery.go` — Parse `xcrun simctl list` for simulator + `xcrun devicectl list` for physical devices | ✅ `simctl` + `devicectl` discovery |
+| 3.2 | `internal/platform/ios/process.go` — Resolve bundle IDs and PIDs on booted simulators via `launchctl list` / `ps -A` | ✅ Simulator process mapping |
+| 3.3 | `internal/platform/ios/telemetry.go` — Poll via `simctl spawn top -l 1 -n 1 -pid <PID>` with PS fallback | ✅ Simulator telemetry via top/ps; physical devices limited by sandbox |
+| 3.4 | `internal/platform/ios/buildinfo.go` — Detect debug/release from `.app` entitlements or Info.plist | ✅ Entitlements + _CodeSignature checks |
+| 3.5 | Wire into `cmd/perfmon/main.go` — Auto-detect Android → fallback to iOS on macOS; `--ios` flag to force iOS mode | ✅ Auto-fallback + `--ios` flag |
 
 ---
 
@@ -69,12 +70,15 @@
 
 | #  | Task | Status |
 |----|------|--------|
-| 4.1 | `internal/export/generator.go` — Orchestrator: select format, render, write to disk | ❌ |
-| 4.2 | `internal/export/templates/export.json` — JSON schema exporter (matching PRD schema) | ❌ |
-| 4.3 | `internal/export/templates/export.md` — Markdown template with stats table | ❌ |
-| 4.4 | `internal/export/templates/export.html` — Embedded HTML with inline CSS + sparkline SVG/ASCII | ❌ |
-| 4.5 | PDF export — Use `go-pdf/gopdf` for vector line graph PDF generation | ❌ |
-| 4.6 | Static asset embedding — `//go:embed` for templates, fonts, CSS | ❌ |
+| 4.1 | `internal/export/export.go` — Orchestrator: format dispatcher, `ResolveOutputPath`, `EnsureOutputDir`, `Export` | ✅ Format dispatch + path resolution |
+| 4.2 | `internal/export/json.go` — JSON schema exporter (matching PRD schema) | ✅ `ExportJSON` with metadata + metrics + telemetry |
+| 4.3 | `internal/export/markdown.go` — Markdown template with stats table + ASCII sparklines | ✅ `ExportMarkdown` with summary + telemetry tables |
+| 4.4 | `internal/export/html.go` — Embedded HTML with inline CSS + SVG vector charts (CPU, Memory, Threads) | ✅ `ExportHTML` with SVG polylines, dark theme |
+| 4.5 | `internal/export/pdf.go` — PDF export using `go-pdf/fpdf` with vector line charts | ✅ `ExportPDF` with multi-page vector line graphs |
+| 4.6 | Static asset embedding — `//go:embed` for CSS, styles | ✅ `templates/style.css` embedded in binary |
+| 4.7 | TUI keybindings — `e` for JSON, `Shift+E` for Markdown, `Ctrl+E` for HTML | ✅ Wired into TUI model |
+| 4.8 | CLI `--export` flag — Non-interactive export mode | ✅ `--export json|md|html|pdf` with 10 samples |
+| 4.9 | Unit tests — 35 tests covering all format generators + utilities | ✅ Pass with `-race` |
 
 ---
 
@@ -87,7 +91,7 @@
 | 5.3 | Binary stripping & size check — `go build -ldflags="-s -w"`, verify <20MB target | ⏳ `make build` configured with `-ldflags="-s -w"`, ~4.7MB |
 | 5.4 | Pre-flight setup wizard — Detect missing `adb`, offer guided install | ❌ |
 | 5.5 | Comprehensive test suite — Unit tests for engine, mock provider, platform parsers | ✅ **61 tests** across 5 files: engine (20), types (7), mock (15), android parsers (50), android pipe (11) |
-| 5.6 | Documentation — README, CLI `--help` output, architecture docs | ✅ 4 docs in `docs/`: plan, architecture, checklist, CLI reference |
+| 5.6 | Documentation — README, CLI `--help` output, architecture docs | ✅ README.md + 4 docs in `docs/`: plan, architecture, checklist, CLI reference |
 | 5.7 | GitHub Release workflow — Automated releases with GoReleaser | ❌ |
 
 ---

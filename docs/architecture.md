@@ -68,14 +68,28 @@ internal/
  │    │    ├── preflight.go       # ADB path detection, version check, device validation
  │    │    ├── provider_test.go   # 50 tests covering parsers, preflight, errors
  │    │    └── pipe_test.go       # 11 tests for persistent pipe (ensureShell, exec, restart, concurrency)
- │    └── ios/                    # (not yet implemented)
+ │    ├── ios/
+ │    │    ├── provider.go        # iOSProvider struct, xcrunExec, simctlSpawn helpers
+ │    │    ├── discovery.go       # xcrun simctl list (simulators) + devicectl (physical)
+ │    │    ├── process.go         # launchctl list / ps process mapping
+ │    │    ├── telemetry.go       # top -l 1 + ps fallback for simulator metrics
+ │    │    ├── buildinfo.go       # Debug/Release via entitlements + _CodeSignature
+ │    │    ├── preflight.go       # xcrun path detection, version check, xcode-select
+ │    │    └── provider_test.go   # 30+ unit tests
+ │    └── mock/
+ │         ├── mock.go            # Deterministic sinusoidal telemetry for --mock mode
+ │         └── mock_test.go       # 15 tests + 1 benchmark
  │
- └── export/                      # (not yet implemented)
-      ├── generator.go
-      └── templates/
-           ├── export.json.tmpl
-           ├── export.md.tmpl
-           └── export.html.tmpl
+ └── export/
+      ├── types.go                # ExportData, Options, BuildExportData
+      ├── export.go               # Format dispatcher, ResolveOutputPath, EnsureOutputDir
+      ├── json.go                 # JSON export (PRD schema v1)
+      ├── markdown.go             # Markdown report with ASCII sparklines + tables
+      ├── html.go                 # HTML report with SVG vector charts (embedded CSS)
+      ├── pdf.go                  # PDF report with vector line graphs (go-pdf/fpdf)
+      ├── templates/
+      │    └── style.css          # Dark-theme CSS for HTML export (//go:embed)
+      └── export_test.go          # 35 tests covering all formats
 ```
 
 ---
@@ -229,11 +243,11 @@ type TelemetryProvider interface {
 | Host CPU overhead | < 2% during profiling | Not yet measured |
 | Polling interval | 1 second (configurable via `--interval`) | ✅ Configurable |
 | Ring buffer capacity | 300 data points (configurable via `--buffer`) | ✅ Configurable |
-| Export formats | JSON, Markdown, HTML, PDF | ❌ Not yet implemented |
-| Target platforms | linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64 | ❌ Only darwin/arm64 tested |
+| Export formats | JSON, Markdown, HTML, PDF | ✅ All 4 formats implemented |
+| Target platforms | linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64 | ✅ All 5 cross-compiled via `make release` |
 | Offline operation | Zero web dependencies at runtime | ✅ No runtime web dependencies |
 | Race condition free | All tests pass with `-race` | ✅ Verified |
-| Test coverage | ≥80% for engine + platform packages | ✅ Engine + mock + android provider covered |
+| Test coverage | ≥80% for engine + platform packages | ✅ Engine + mock + android + ios + export covered |
 
 ---
 
