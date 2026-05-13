@@ -1,9 +1,12 @@
-.PHONY: build cross-build run mock test test-short test-adb lint fmt clean tidy dev all release
+.PHONY: build cross-build run mock test test-short test-adb lint fmt clean tidy dev all release github-release
 
 APP_NAME := perfmon
 GO_FLAGS := -ldflags="-s -w"
 COVERAGE_FILE := coverage.out
 DIST_DIR := dist
+
+# Auto-detect version from source; override with: make release VERSION=1.1.0
+VERSION ?= $(shell grep 'const version' cmd/perfmon/main.go | sed 's/.*"\(.*\)".*/\1/')
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -12,7 +15,7 @@ help: ## Show this help
 build: ## Build the binary
 	go build -o $(APP_NAME) $(GO_FLAGS) ./cmd/perfmon/
 
-cross-build: ## Build binaries for all platforms (linux/darwin/windows × amd64/arm64)
+cross-build: ## Build binaries for all platforms (linux/darwin/windows x amd64/arm64)
 	@mkdir -p $(DIST_DIR)
 	@echo "=== Cross-platform build ==="
 	@for goos in linux darwin windows; do \
@@ -21,15 +24,46 @@ cross-build: ## Build binaries for all platforms (linux/darwin/windows × amd64/
 	    ext=""; \
 	    if [ "$$goos" = "windows" ]; then ext=".exe"; fi; \
 	    out="$(DIST_DIR)/$(APP_NAME)-$$goos-$$goarch$$ext"; \
-	    echo "  building $$goos/$$goarch → $$out"; \
+	    echo "  building $$goos/$$goarch -> $$out"; \
 	    GOOS=$$goos GOARCH=$$goarch go build -o $$out $(GO_FLAGS) ./cmd/perfmon/; \
 	    ls -lh "$$out" | awk '{print "    " $$5}'; \
 	  done; \
 	done
-	@echo "=== Done — $(DIST_DIR)/ contents ==="
+	@echo "=== Done - $(DIST_DIR)/ contents ==="
 	@ls -lh $(DIST_DIR)/
 
-release: cross-build ## Alias for cross-build
+release: cross-build ## Build all binaries and create a GitHub Release (requires gh CLI)
+	@echo ""
+	@echo "============================================"
+	@echo "  Creating GitHub Release v$(VERSION)"
+	@echo "============================================"
+	@if ! command -v gh >/dev/null 2>&1; then \
+	  echo "ERROR: GitHub CLI (gh) is required."; \
+	  echo "  Install: brew install gh   (macOS)"; \
+	  echo "  Or:      sudo apt install gh (Linux)"; \
+	  exit 1; \
+	fi
+	@if ! gh auth status >/dev/null 2>&1; then \
+	  echo "ERROR: Not authenticated with GitHub CLI."; \
+	  echo "  Run: gh auth login"; \
+	  exit 1; \
+	fi
+	@if [ -z "$$(git tag -l 'v$(VERSION)')" ]; then \
+	  echo "  Creating git tag v$(VERSION)..."; \
+	  git tag -a "v$(VERSION)" -m "Release v$(VERSION)"; \
+	  git push origin "v$(VERSION)"; \
+	  echo "  Tag pushed."; \
+	else \
+	  echo "  Tag v$(VERSION) already exists. Use --edit to update the release."; \
+	fi
+	gh release create "v$(VERSION)" $(DIST_DIR)/* \
+	  --title "v$(VERSION)" \
+	  --generate-notes
+	@echo ""
+	@echo " Release v$(VERSION) created:"
+	@gh release view "v$(VERSION)" --json url -q .url
+
+github-release: release ## Alias for release
 
 run: ## Run without mock mode
 	go run ./cmd/perfmon/
