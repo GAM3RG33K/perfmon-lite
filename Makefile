@@ -1,4 +1,4 @@
-.PHONY: build cross-build run mock test test-short test-adb lint fmt clean tidy dev all release github-release
+.PHONY: build cross-build run mock test test-short test-adb lint fmt clean tidy dev all release github-release hooks
 
 APP_NAME := perfmon
 GO_FLAGS := -ldflags="-s -w"
@@ -95,6 +95,12 @@ clean: ## Remove build artifacts
 tidy: ## Tidy Go modules
 	go mod tidy
 
+hooks: ## Install git hooks
+	@echo "Installing pre-commit hook..."
+	git config core.hooksPath .githooks
+	@echo "✅ Git hooks installed from .githooks/"
+	@echo "   (pre-commit: validates docs match the codebase)"
+
 dev: mock ## Alias for mock mode (default dev workflow)
 
-all: tidy fmt build test ## Run all checks
+all: tidy fmt hooks build test ## Run all checks (includes hook setup)

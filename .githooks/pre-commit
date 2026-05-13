@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# ─── pre-commit: perfmon docs syncing checker ────────────────────────────────
+# Validates that documentation stays in sync with the codebase.
+# Runs only when docs/ or code files have been staged for commit.
+# ──────────────────────────────────────────────────────────────────────────────
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# Only run checks when docs or Go source files are staged
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+if ! echo "$STAGED" | grep -qE '^(docs/|cmd/|internal/|\.githooks/)'; then
+    exit 0
+fi
+
+ERRORS=0
+WARNINGS=0
+
+fail() { echo "  ❌ $1"; ERRORS=$((ERRORS + 1)); }
+warn() { echo "  ⚠️  $1"; WARNINGS=$((WARNINGS + 1)); }
+pass() { echo "  ✅ $1"; }
+
+# ─── 1. CLI flag parity: main.go vs docs/cli-reference.md ────────────────
+
+echo ""
+echo "── CLI flag parity ──────────────────────────────────────────"
+
+if [ -f "cmd/perfmon/main.go" ] && [ -f "docs/cli-reference.md" ]; then
+    # Extract documented flags: lines like `| \`--mock\` |` in markdown table
+    DOC_FLAGS=$(grep -oP '\`--[a-z_-]+\`' docs/cli-reference.md \
+                | sed 's/`--//;s/`//' | sort -u || true)
+
+    # Extract flags defined in main.go via flag.Bool/flag.String/flag.Int
+    CODE_FLAGS=$(grep -oP 'flag\.(Bool|String|Int)\("\K[^"]+' cmd/perfmon/main.go \
+                 | sort -u || true)
+
+    # Check: flags in code but not in docs
+    while IFS= read -r flag; do
+        [ -z "$flag" ] && continue
+        if ! echo "$DOC_FLAGS" | grep -qF "$flag"; then
+            fail "flag --$flag is defined in main.go but not documented in docs/cli-reference.md"
+        else
+            pass "flag --$flag documented"
+        fi
+    done <<< "$CODE_FLAGS"
+
+    # Check: flags in docs but not in code (might be planned)
+    while IFS= read -r flag; do
+        [ -z "$flag" ] && continue
+        if ! echo "$CODE_FLAGS" | grep -qF "$flag"; then
+            warn "flag --$flag is in docs/cli-reference.md but not found in main.go"
+        fi
+    done <<< "$DOC_FLAGS"
+else
+    warn "Skipping CLI flag check — main.go or docs/cli-reference.md not found"
+fi
+
+# ─── 2. Export format constants vs docs ─────────────────────────────────
+
+echo ""
+echo "── Export format parity ──────────────────────────────────────"
+
+if [ -f "internal/export/types.go" ] && [ -f "docs/cli-reference.md" ]; then
+    # Extract Format constant values from types.go
+    FORMATS=$(grep -oP 'Format\w+\s+Format\s*=\s*"\K[^"]+' internal/export/types.go \
+              | sort -u || true)
+
+    # Extract all format mentions from docs (backtick-wrapped words in format sections)
+    # Look specifically in the format table or export examples
+    DOC_FORMATS=$(sed -n '/|.*Format.*|/,/^$/p' docs/cli-reference.md \
+                  | grep -oP '\`[a-z]+\`' | tr -d '`' | sort -u || true)
+
+    # Broader search: find backtick-wrapped format values in the whole doc
+    if [ -z "$DOC_FORMATS" ]; then
+        DOC_FORMATS=$(grep -oP '\b(json|md|markdown|html|pdf)\b' docs/cli-reference.md \
+                      | sort -u || true)
+    fi
+
+    while IFS= read -r fmt; do
+        [ -z "$fmt" ] && continue
+        if echo "$DOC_FORMATS" | grep -qwiF "$fmt"; then
+            pass "export format '$fmt' documented"
+        else
+            fail "export format '$fmt' is defined in types.go but not found in docs/cli-reference.md"
+        fi
+    done <<< "$FORMATS"
+else
+    warn "Skipping export format check — types.go or docs/cli-reference.md not found"
+fi
+
+# ─── 3. Go source file references in docs exist on disk ─────────────────
+
+echo ""
+echo "── Go file references in docs ──────────────────────────────"
+
+# Check .go file references in architecture.md and plan.md
+for DOCFILE in docs/architecture.md docs/plan.md docs/checklist.md; do
+    [ ! -f "$DOCFILE" ] && continue
+    # Extract .go file paths from backtick-wrapped references
+    GO_FILES=$(grep -oP '\`\K([a-zA-Z0-9_./-]+\.go)(?=\`)' "$DOCFILE" | sort -u || true)
+    while IFS= read -r gf; do
+        [ -z "$gf" ] && continue
+        # Skip test file references that end with _test.go (handled in check 4)
+        echo "$gf" | grep -q '_test\.go$' && continue
+        if [ -f "$gf" ]; then
+            pass "$gf exists"
+        else
+            # Try with internal/ prefix for path-shortened references
+            if [ -f "internal/$gf" ]; then
+                pass "$gf exists (internal/$gf)"
+            else
+                fail "$gf referenced in $DOCFILE but not found on disk"
+            fi
+        fi
+    done <<< "$GO_FILES"
+done
+
+# ─── 4. Test file existence: docs/architecture.md + docs/checklist.md ──
+
+echo ""
+echo "── Test file existence ──────────────────────────────────────"
+
+for DOCFILE in docs/architecture.md docs/checklist.md; do
+    [ ! -f "$DOCFILE" ] && continue
+    TEST_FILES=$(grep -oP '\`\K([a-zA-Z0-9_./-]+_test\.go)(?=\`)' "$DOCFILE" | sort -u || true)
+    while IFS= read -r tf; do
+        [ -z "$tf" ] && continue
+        if [ -f "$tf" ]; then
+            pass "test file $tf (from $DOCFILE)"
+        else
+            fail "test file $tf referenced in $DOCFILE but not found"
+        fi
+    done <<< "$TEST_FILES"
+done
+
+# ─── 5. Quick syntax check on changed Go packages ─────────────────────
+
+echo ""
+echo "── Quick syntax check ───────────────────────────────────────"
+
+CHANGED_GO=$(echo "$STAGED" | grep '\.go$' || true)
+if [ -n "$CHANGED_GO" ]; then
+    # Vet the first changed package only (keeps it fast)
+    FIRST_DIR=$(echo "$CHANGED_GO" | head -1 | xargs dirname)
+    if [ -d "$FIRST_DIR" ]; then
+        if go vet "./$FIRST_DIR" 2>/dev/null; then
+            pass "go vet $FIRST_DIR"
+        else
+            fail "go vet $FIRST_DIR failed (run 'go vet ./$FIRST_DIR' for details)"
+        fi
+    fi
+else
+    pass "no Go files changed"
+fi
+
+# ─── Summary ────────────────────────────────────────────────────────────
+
+echo ""
+echo "── Results ─────────────────────────────────────────────────"
+echo "  $ERRORS error(s), $WARNINGS warning(s)"
+
+if [ "$ERRORS" -gt 0 ]; then
+    echo ""
+    echo "  ❌ Some docs are out of sync with the codebase."
+    echo "     Fix the issues above, then commit again."
+    exit 1
+fi
+
+if [ "$WARNINGS" -gt 0 ]; then
+    echo "  ⚠️  Warnings found (not blocking commit)."
+fi
+
+exit 0
