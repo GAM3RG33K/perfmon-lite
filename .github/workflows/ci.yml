@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  GO_VERSION: "1.26"
+
+jobs:
+  # ─── Build, Vet & Unit Tests ──────────────────────────────────────────
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build
+        run: go build -o perfmon -ldflags="-s -w" ./cmd/perfmon/
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test (unit)
+        run: go test -v -race -count=1 ./... 2>&1
+
+      - name: Binary smoke test (mock)
+        run: |
+          ./perfmon --version
+          ./perfmon --help
+          timeout 3 ./perfmon --mock 2>&1; code=$?; \
+            if [ "$code" = "124" ]; then echo "MOCK_TUI_OK"; else exit $code; fi
+
+      - name: Upload binary (linux/amd64)
+        uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: perfmon-linux-amd64
+          path: perfmon
+          retention-days: 7
+
+  # ─── Cross-platform Build ─────────────────────────────────────────────
+  cross-build:
+    name: Cross-platform Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+        run: |
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+            go build -o perfmon-${{ matrix.goos }}-${{ matrix.goarch }} \
+            -ldflags="-s -w" ./cmd/perfmon/
+          ls -lh perfmon-${{ matrix.goos }}-${{ matrix.goarch }}
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: perfmon-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: perfmon-${{ matrix.goos }}-${{ matrix.goarch }}
+          retention-days: 7
+
+  # ─── ADB Integration Tests (Android emulator) ─────────────────────────
+  adb-integration:
+    name: ADB Integration Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        api-level: [34]
+        target: [google_apis]
+        arch: [x86_64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -la /dev/kvm
+
+      - name: ADB Integration Tests (with emulator)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
+          arch: ${{ matrix.arch }}
+          emulator-options: -no-snapshot -no-window -no-audio -gpu swiftshader_indirect -memory 2048
+          disable-animations: true
+          script: |
+            adb devices -l
+            cd ${{ github.workspace }}
+            go test -tags=adb_test -v -race -count=1 ./internal/platform/android/
