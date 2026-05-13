@@ -12,6 +12,7 @@ import (
 
 	"github.com/w1n/perfmon/internal/engine"
 	"github.com/w1n/perfmon/internal/platform/android"
+	iosPkg "github.com/w1n/perfmon/internal/platform/ios"
 	"github.com/w1n/perfmon/internal/platform/mock"
 	perfmonTui "github.com/w1n/perfmon/internal/tui"
 )
@@ -21,6 +22,7 @@ const version = "1.0.0"
 func main() {
 	// CLI flags
 	mockMode := flag.Bool("mock", false, "Run with simulated telemetry data (no device required)")
+	iOSMode := flag.Bool("ios", false, "Force iOS mode (use xcrun instead of ADB)")
 	intervalFlag := flag.Int("interval", 1, "Polling interval in seconds (range: 1-60)")
 	bufferFlag := flag.Int("buffer", 300, "Ring buffer capacity (number of data points)")
 	exportFlag := flag.String("export", "", "Export format: json, md, html, pdf")
@@ -92,117 +94,20 @@ func main() {
 			log.Printf("Starting perfmon v%s (mock mode: interval=%ds, buffer=%d)\n",
 				version, *intervalFlag, *bufferFlag)
 		}
+	} else if *iOSMode {
+		// ── iOS mode (forced via --ios flag) ────────────────────────────
+		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform = setupiOSProvider(*verboseFlag)
 	} else {
-		// ── Android mode ────────────────────────────────────────────────
-		if *verboseFlag {
-			log.Print("Looking for ADB...")
-		}
+		// ── Auto-detect: try Android first, then iOS on macOS ──────────
+		var androidErr error
+		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, androidErr = tryAndroidProvider(*verboseFlag)
 
-		adbPath, err := android.FindAdbPath()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ADB not found: %v\n", err)
-		fmt.Fprint(os.Stderr, hintInstallADB())
-		os.Exit(1)
-	}
-
-		if *verboseFlag {
-			log.Printf("ADB found at: %s", adbPath)
-		}
-
-		// Verify ADB version
-		adbVer, err := android.CheckVersion(adbPath)
-		if err != nil {
-			log.Fatalf("ADB version check failed: %v", err)
-		}
-		if *verboseFlag {
-			log.Printf("ADB version: %s", adbVer.String())
-		}
-
-		// Create the Android provider
-		androidProvider := android.NewProvider(adbPath)
-
-		// Discover connected devices
-		devices, err := androidProvider.Discover()
-		if err != nil {
-			log.Fatalf("Failed to discover Android devices: %v", err)
-		}
-		if len(devices) == 0 {
-			log.Fatalf("No Android devices found. Connect a device or use --mock for development.")
-		}
-
-		if *verboseFlag {
-			log.Printf("Found %d device(s):", len(devices))
-			for _, d := range devices {
-				typ := "emulator"
-				if d.IsPhysical {
-					typ = "physical"
-				}
-				log.Printf("  %s (%s) — %s", d.Name, d.ID, typ)
-			}
-		}
-
-		// Auto-select the first device
-		selectedDevice := devices[0]
-		androidProvider.SetDevice(selectedDevice.ID)
-		discoveredDevices = devices
-
-		if *verboseFlag {
-			log.Printf("Selected device: %s (%s)", selectedDevice.Name, selectedDevice.ID)
-		}
-
-		// Validate device reachability
-		if err := android.ValidateDevice(adbPath, selectedDevice.ID); err != nil {
-			log.Fatalf("Device %s is not reachable: %v", selectedDevice.ID, err)
-		}
-
-		if *verboseFlag {
-			log.Print("Device is reachable — discovering processes...")
-		}
-
-		// Discover processes on the device
-		processes, err := androidProvider.MapProcesses(selectedDevice.ID)
-		if err != nil {
-			log.Fatalf("Failed to list processes on %s: %v", selectedDevice.ID, err)
-		}
-		if len(processes) == 0 {
-			log.Fatalf("No processes found on device %s", selectedDevice.ID)
-		}
-
-		if *verboseFlag {
-			log.Printf("Found %d processes. Scanning for user applications...", len(processes))
-		}
-
-		// Select the most interesting process — prefer a user app with a package name
-		// containing a dot (indicating a Java/Kotlin app), falling back to the first
-		// non-system process, then the first process overall.
-		selectedProcess := selectBestProcess(processes)
-		initialPID = selectedProcess.PID
-
-		if *verboseFlag {
-			log.Printf("Selected process: %s (PID %d) [%s]",
-				selectedProcess.PackageName, selectedProcess.PID, selectedProcess.BuildType)
-		}
-
-		// Detect build type for the selected process
-		buildType, err := androidProvider.BuildType(selectedDevice.ID, selectedProcess.PackageName)
-		if err == nil {
-			selectedProcess.BuildType = buildType
+		if androidErr != nil {
 			if *verboseFlag {
-				log.Printf("Build type: %s", buildType)
+				log.Printf("Android not available: %v — trying iOS...", androidErr)
 			}
+			provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform = setupiOSProvider(*verboseFlag)
 		}
-
-		// Update the process in the list with the resolved build type
-		for i := range processes {
-			if processes[i].PID == selectedProcess.PID {
-				processes[i].BuildType = buildType
-				break
-			}
-		}
-		discoveredProcesses = processes
-
-		provider = androidProvider
-		targetPlatform = engine.PlatformAndroid
 	}
 
 	// ══════════════════════════════════════════════════════════════════════
@@ -248,6 +153,8 @@ func main() {
 
 	if *mockMode {
 		model.Logs.AddEntry("INFO", "Mock mode — simulated telemetry data")
+	} else if targetPlatform == engine.PlatformIOS {
+		model.Logs.AddEntry("INFO", "iOS mode — live device telemetry")
 	} else {
 		model.Logs.AddEntry("INFO", "Android mode — live device telemetry")
 	}
@@ -265,16 +172,243 @@ func main() {
 	}
 }
 
-// selectBestProcess picks the most interesting process from a list of Android processes.
+// hintInstallXcode returns a help string for installing Xcode.
+func hintInstallXcode() string {
+	return `
+  ── Xcode Installation Help ────────────────────────────
+    macOS (App Store):  Install Xcode from the App Store
+    macOS (CLI tools):  xcode-select --install
+    Verify:             xcrun simctl list
+  ────────────────────────────────────────────────────────
+  Or run with --mock for development:  perfmon --mock
+`
+}
+
+// tryAndroidProvider attempts to set up the Android provider.
+// Returns an error if ADB is not available or no Android devices are found.
+func tryAndroidProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, []engine.AppProcess, int32, engine.Platform, error) {
+	if verbose {
+		log.Print("Looking for ADB...")
+	}
+
+	adbPath, err := android.FindAdbPath()
+	if err != nil {
+		return nil, nil, nil, 0, "", fmt.Errorf("ADB not found: %w", err)
+	}
+
+	if verbose {
+		log.Printf("ADB found at: %s", adbPath)
+	}
+
+	// Verify ADB version
+	adbVer, err := android.CheckVersion(adbPath)
+	if err != nil {
+		return nil, nil, nil, 0, "", fmt.Errorf("ADB version check failed: %w", err)
+	}
+	if verbose {
+		log.Printf("ADB version: %s", adbVer.String())
+	}
+
+	// Create the Android provider
+	androidProvider := android.NewProvider(adbPath)
+
+	// Discover connected devices
+	devices, err := androidProvider.Discover()
+	if err != nil {
+		return nil, nil, nil, 0, "", fmt.Errorf("failed to discover Android devices: %w", err)
+	}
+	if len(devices) == 0 {
+		return nil, nil, nil, 0, "", fmt.Errorf("no Android devices found")
+	}
+
+	if verbose {
+		log.Printf("Found %d device(s):", len(devices))
+		for _, d := range devices {
+			typ := "emulator"
+			if d.IsPhysical {
+				typ = "physical"
+			}
+			log.Printf("  %s (%s) — %s", d.Name, d.ID, typ)
+		}
+	}
+
+	// Auto-select the first device
+	selectedDevice := devices[0]
+	androidProvider.SetDevice(selectedDevice.ID)
+
+	if verbose {
+		log.Printf("Selected device: %s (%s)", selectedDevice.Name, selectedDevice.ID)
+	}
+
+	// Validate device reachability
+	if err := android.ValidateDevice(adbPath, selectedDevice.ID); err != nil {
+		return nil, nil, nil, 0, "", fmt.Errorf("device %s is not reachable: %w", selectedDevice.ID, err)
+	}
+
+	if verbose {
+		log.Print("Device is reachable — discovering processes...")
+	}
+
+	// Discover processes on the device
+	processes, err := androidProvider.MapProcesses(selectedDevice.ID)
+	if err != nil {
+		return nil, nil, nil, 0, "", fmt.Errorf("failed to list processes on %s: %w", selectedDevice.ID, err)
+	}
+	if len(processes) == 0 {
+		return nil, nil, nil, 0, "", fmt.Errorf("no processes found on device %s", selectedDevice.ID)
+	}
+
+	if verbose {
+		log.Printf("Found %d processes. Scanning for user applications...", len(processes))
+	}
+
+	selectedProcess := selectBestProcess(processes)
+	initialPID := selectedProcess.PID
+
+	if verbose {
+		log.Printf("Selected process: %s (PID %d) [%s]",
+			selectedProcess.PackageName, selectedProcess.PID, selectedProcess.BuildType)
+	}
+
+	// Detect build type for the selected process
+	buildType, err := androidProvider.BuildType(selectedDevice.ID, selectedProcess.PackageName)
+	if err == nil {
+		selectedProcess.BuildType = buildType
+		if verbose {
+			log.Printf("Build type: %s", buildType)
+		}
+	}
+
+	// Update the process in the list with the resolved build type
+	for i := range processes {
+		if processes[i].PID == selectedProcess.PID {
+			processes[i].BuildType = buildType
+			break
+		}
+	}
+
+	return androidProvider, devices, processes, initialPID, engine.PlatformAndroid, nil
+}
+
+// setupiOSProvider creates and configures the iOS provider.
+func setupiOSProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, []engine.AppProcess, int32, engine.Platform) {
+	if verbose {
+		log.Print("Looking for xcrun...")
+	}
+
+	xcrunPath, err := iosPkg.FindXcrunPath()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "iOS Error: %v\n", err)
+		fmt.Fprint(os.Stderr, hintInstallXcode())
+		os.Exit(1)
+	}
+
+	if verbose {
+		log.Printf("xcrun found at: %s", xcrunPath)
+	}
+
+	// Verify xcrun version
+	xcrunVer, err := iosPkg.CheckVersion(xcrunPath)
+	if err != nil {
+		log.Fatalf("xcrun version check failed: %v", err)
+	}
+	if verbose {
+		log.Printf("xcrun version: %s", xcrunVer.String())
+	}
+
+	// Check xcode-select
+	if err := iosPkg.CheckXcodeSelect(); err != nil {
+		log.Fatalf("Xcode not configured: %v", err)
+	}
+
+	// Create the iOS provider
+	iOSProvider := iosPkg.NewProvider(xcrunPath)
+
+	// Discover iOS devices and simulators
+	devices, err := iOSProvider.Discover()
+	if err != nil {
+		log.Fatalf("Failed to discover iOS devices: %v", err)
+	}
+	if len(devices) == 0 {
+		log.Fatalf("No iOS devices or simulators found. Boot a simulator, connect a device, or use --mock for development.")
+	}
+
+	if verbose {
+		log.Printf("Found %d iOS device(s):", len(devices))
+		for _, d := range devices {
+			typ := "simulator"
+			if d.IsPhysical {
+				typ = "physical"
+			}
+			log.Printf("  %s (%s) — %s", d.Name, d.ID, typ)
+		}
+	}
+
+	// Cache devices for later lookups
+	iOSProvider.CacheDevices(devices)
+
+	// Auto-select the first device
+	selectedDevice := devices[0]
+	iOSProvider.SetDevice(selectedDevice.ID)
+
+	if verbose {
+		log.Printf("Selected device: %s (%s)", selectedDevice.Name, selectedDevice.ID)
+	}
+
+	// Discover processes
+	processes, err := iOSProvider.MapProcesses(selectedDevice.ID)
+	if err != nil {
+		log.Fatalf("Failed to list processes on %s: %v", selectedDevice.ID, err)
+	}
+	if len(processes) == 0 {
+		log.Fatalf("No processes found on device %s", selectedDevice.ID)
+	}
+
+	if verbose {
+		log.Printf("Found %d processes.", len(processes))
+	}
+
+	// Select the best process
+	selectedProcess := selectBestProcess(processes)
+	initialPID := selectedProcess.PID
+
+	if verbose {
+		log.Printf("Selected process: %s (PID %d) [%s]",
+			selectedProcess.PackageName, selectedProcess.PID, selectedProcess.BuildType)
+	}
+
+	// Detect build type
+	buildType, err := iOSProvider.BuildType(selectedDevice.ID, selectedProcess.PackageName)
+	if err == nil {
+		selectedProcess.BuildType = buildType
+		if verbose {
+			log.Printf("Build type: %s", buildType)
+		}
+	}
+
+	// Update the process list with resolved build type
+	for i := range processes {
+		if processes[i].PID == selectedProcess.PID {
+			processes[i].BuildType = buildType
+			break
+		}
+	}
+
+	return iOSProvider, devices, processes, initialPID, engine.PlatformIOS
+}
+
+// selectBestProcess picks the most interesting process from a list of processes.
 // Preference order:
-//  1. A process whose package name contains a dot (user app, not a native daemon)
+//  1. A process whose name/package contains a dot (user app, not a system daemon)
 //  2. The first non-kernel process
 //  3. The first process overall
 func selectBestProcess(processes []engine.AppProcess) engine.AppProcess {
-	// First pass: find user apps (package names with a dot)
+	// First pass: find user apps (names with a dot)
 	var userApps []engine.AppProcess
 	for _, p := range processes {
-		if strings.Contains(p.PackageName, ".") && !strings.HasPrefix(p.PackageName, "android.") {
+		if strings.Contains(p.PackageName, ".") &&
+			!strings.HasPrefix(p.PackageName, "android.") &&
+			!strings.HasPrefix(p.PackageName, "com.apple.") {
 			userApps = append(userApps, p)
 		}
 	}
