@@ -48,13 +48,16 @@
 
 ## Phase 2: Android Subsystem
 
-- [ ] `internal/platform/android/discovery.go` — `adb devices -l` parser
-- [ ] `internal/platform/android/process.go` — `adb shell ps` parser
-- [ ] `internal/platform/android/telemetry.go` — `dumpsys meminfo` + `top` parsers
-- [ ] `internal/platform/android/buildinfo.go` — Debug/Release detection
-- [ ] `internal/platform/android/preflight.go` — ADB health check
-- [ ] Long-lived ADB pipe connection (instead of per-sample exec)
-- [ ] End-to-end: select Android device → see live telemetry in TUI
+- [x] `internal/platform/android/discovery.go` — `adb devices -l` parser
+- [x] `internal/platform/android/process.go` — `adb shell ps` parser + BuildType detection
+- [x] `internal/platform/android/telemetry.go` — `top` CPU + `/proc/pid/status` memory/threads parsers
+- [x] `internal/platform/android/buildinfo.go` — Debug/Release detection via dumpsys package (merged into process.go)
+- [x] `internal/platform/android/preflight.go` — ADB health check, version parsing, device validation
+- [x] Long-lived ADB pipe connection (peristent `adb shell`, ensureShell/execInShell/closeShell, auto-restart on failure)
+- [x] End-to-end: auto-discover Android device, select best process, pipe-based telemetry in TUI
+- [x] `internal/platform/android/provider.go` — ADBProvider struct, adb helper, SetDevice, interface compliance
+- [x] `internal/platform/android/provider_test.go` — 50 tests covering discovery, process, telemetry, preflight, adb errors
+- [x] `internal/platform/android/pipe_test.go` — 11 tests covering ensureShell, execInShell, pipe restart, fallback, concurrency
 
 ---
 
@@ -101,8 +104,8 @@
 |-------|-------------|------|---|
 | 0: Scaffolding | 7 | 5 | 71% |
 | 1: Engine + TUI | 12 | 12 | 100% |
-| 2: Android | 6 | 0 | 0% |
+| 2: Android | 9 | 8 | 89% |
 | 3: iOS | 4 | 0 | 0% |
 | 4: Export | 6 | 0 | 0% |
 | 5: Polish | 10 | 4 | 40% |
-| **Total** | **45** | **21** | **47%** |
+| **Total** | **48** | **29** | **60%** |

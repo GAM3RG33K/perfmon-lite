@@ -60,7 +60,14 @@ internal/
  │    ├── mock/
  │    │    ├── mock.go            # Mock provider for --mock mode
  │    │    └── mock_test.go       # Mock provider unit tests (15 tests + 1 benchmark)
- │    ├── android/                # (not yet implemented)
+ │    ├── android/
+ │    │    ├── provider.go        # ADBProvider struct, persistent shell pipe (ensureShell/execInShell/closeShell)
+ │    │    ├── discovery.go       # `adb devices -l` parser, device listing
+ │    │    ├── process.go         # `adb shell ps` parser + BuildType detection via dumpsys
+ │    │    ├── telemetry.go       # CPU (top), memory (VmRSS), threads (/proc) sampling via pipe
+ │    │    ├── preflight.go       # ADB path detection, version check, device validation
+ │    │    ├── provider_test.go   # 50 tests covering parsers, preflight, errors
+ │    │    └── pipe_test.go       # 11 tests for persistent pipe (ensureShell, exec, restart, concurrency)
  │    └── ios/                    # (not yet implemented)
  │
  └── export/                      # (not yet implemented)
@@ -226,7 +233,7 @@ type TelemetryProvider interface {
 | Target platforms | linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64 | ❌ Only darwin/arm64 tested |
 | Offline operation | Zero web dependencies at runtime | ✅ No runtime web dependencies |
 | Race condition free | All tests pass with `-race` | ✅ Verified |
-| Test coverage | ≥80% for engine + platform packages | ✅ Engine + mock provider covered |
+| Test coverage | ≥80% for engine + platform packages | ✅ Engine + mock + android provider covered |
 
 ---
 
@@ -239,6 +246,8 @@ type TelemetryProvider interface {
 | `internal/engine/engine_test.go` | 20 tests | Ring buffer: new/empty, push/chronological order, eviction, latest, count, single-element, non-mutation, concurrent push, concurrent read/write. Engine: new, start/stop, set-target, poll, no-target error, provider error, close, concurrent poll safety |
 | `internal/engine/types_test.go` | 7 tests | MetricsSummary: empty, single, multiple, uniform, floating-point, zero values. NewTelemetrySnapshot |
 | `internal/platform/mock/mock_test.go` | 15 tests + 1 benchmark | Provider: deterministic output, different seeds, valid ranges, sinusoidal variation, step increment, PID ignored, memory leak after 100, leak cap, thread variation, copy semantics, close. Static helpers: MockDevice, MockProcess. BenchmarkSample |
+| `internal/platform/android/provider_test.go` | 50 tests | Discovery: empty/headers/emulators/physical/offline/unauthorized. Process: empty/header-only/app/kernel-threads/multiple. BuildType: debuggable/release/alt-format/empty. Telemetry: CPU found/not-found/empty/zero/varied, VmRSS found/not-found/empty/zero, Threads found/not-found/empty/many. Preflight: version parse/no-match/empty/string. Provider: new/set-device/adb-command/close/interfaces/AdbError |
+| `internal/platform/android/pipe_test.go` | 11 tests | Pipe: ensureShell opens/closes, idempotent, simple command, multiple commands, reconnects after close, Close cleanup. Sample: fake PID error, no device error, SetDevice edge cases (empty, reopen). Concurrency: 10 concurrent Sample calls, 20 concurrent SetDevice calls, Close idempotent |
 
 ### Test Properties
 

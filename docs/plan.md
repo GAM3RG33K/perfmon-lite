@@ -45,12 +45,12 @@
 
 | #  | Task | Status |
 |----|------|--------|
-| 2.1 | `internal/platform/android/discovery.go` — Parse `adb devices -l` output for device discovery | ❌ |
-| 2.2 | `internal/platform/android/process.go` — Parse `adb shell ps` / `top` for app/PID mapping | ❌ |
-| 2.3 | `internal/platform/android/telemetry.go` — Poll CPU via `adb shell top -n 1`, memory via `adb shell dumpsys meminfo <pid>` | ❌ |
-| 2.4 | `internal/platform/android/buildinfo.go` — Detect debug/release via `adb shell dumpsys package` | ❌ |
-| 2.5 | `internal/platform/android/preflight.go` — Validate `adb` in PATH, device reachability, connection health | ❌ |
-| 2.6 | Long-lived ADB shell connection — Persistent `adb shell` pipe instead of per-sample process spawns | ❌ |
+| 2.1 | `internal/platform/android/discovery.go` — Parse `adb devices -l` output for device discovery | ✅ Parses serial, product, model, transport; filters offline/unauthorized; emulator detection |
+| 2.2 | `internal/platform/android/process.go` — Parse `adb shell ps` / for app/PID mapping | ✅ Field-based ps parser, kernel thread filtering, BuildType via dumpsys package |
+| 2.3 | `internal/platform/android/telemetry.go` — Poll CPU via `adb shell top -n 1`, memory via `/proc/<pid>/status` | ✅ CPU parser, VmRSS parser, threads parser, combined Sample() method |
+| 2.4 | `internal/platform/android/buildinfo.go` — Detect debug/release via `adb shell dumpsys package` | ✅ Merged into process.go — `parseBuildType` detects DEBUGGABLE flag |
+| 2.5 | `internal/platform/android/preflight.go` — Validate `adb` in PATH, device reachability, connection health | ✅ Default path list, version parser, ValidateDevice health check |
+| 2.6 | Long-lived ADB shell connection — Persistent `adb shell` pipe instead of per-sample process spawns | ✅ Persistent pipe with ensureShell/execInShell/closeShell, automatic restart on failure, fallback to one-shot adbExec |
 
 ---
 
@@ -86,7 +86,7 @@
 | 5.2 | Performance optimization — Profiling loop <2% host CPU overhead | ❌ |
 | 5.3 | Binary stripping & size check — `go build -ldflags="-s -w"`, verify <20MB target | ⏳ `make build` configured with `-ldflags="-s -w"`, ~4.7MB |
 | 5.4 | Pre-flight setup wizard — Detect missing `adb`, offer guided install | ❌ |
-| 5.5 | Comprehensive test suite — Unit tests for engine, mock provider, platform parsers | ✅ **42 tests** across 3 files: ring buffer (12), engine (8), MetricsSummary (7), mock provider (15) |
+| 5.5 | Comprehensive test suite — Unit tests for engine, mock provider, platform parsers | ✅ **61 tests** across 5 files: engine (20), types (7), mock (15), android parsers (50), android pipe (11) |
 | 5.6 | Documentation — README, CLI `--help` output, architecture docs | ✅ 4 docs in `docs/`: plan, architecture, checklist, CLI reference |
 | 5.7 | GitHub Release workflow — Automated releases with GoReleaser | ❌ |
 

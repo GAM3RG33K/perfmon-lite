@@ -307,8 +307,9 @@ func (m *Model) renderFooter() string {
 	return styles.FooterStyle.Width(footerWidth).Render(strings.Join(hints, "  "))
 }
 
-// SetMockData populates the mock device and process data into the TUI views.
-func (m *Model) SetMockData(devices []engine.Device, processes []engine.AppProcess) {
+// SetTargets populates the device and process data into the TUI views.
+// Used both in mock mode and when connected to a real device.
+func (m *Model) SetTargets(devices []engine.Device, processes []engine.AppProcess) {
 	m.TargetSelector.Devices = devices
 	m.TargetSelector.Processes = processes
 }
