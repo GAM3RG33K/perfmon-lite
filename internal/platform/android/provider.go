@@ -109,28 +109,33 @@ func (p *ADBProvider) ensureShell() error {
 	p.shellOut = bufio.NewReader(merged)
 	p.shellOpen = true
 
-	// Warm up the shell by waiting briefly for the prompt
-	// Not strictly necessary but helps flush startup noise
-	_ = p.flushShell(time.Second)
+	// Give the shell a moment to start, then drain any startup output.
+	// The adb shell doesn't print a prompt by default, but this handles
+	// unexpected banner output or initial echo.
+	p.flushShell(time.Second)
 
 	return nil
 }
 
-// flushShell drains any buffered data from the shell (e.g., the initial prompt).
-func (p *ADBProvider) flushShell(timeout time.Duration) error {
+// flushShell drains any data the shell may have emitted at startup
+// (e.g., ANSI reset sequences or a shell prompt).
+// Uses only non-blocking operations to avoid data races.
+func (p *ADBProvider) flushShell(timeout time.Duration) {
+	// Wait a brief moment for the shell to start producing output.
+	// Then drain only what's already in the in-memory buffer.
+	// Any data that arrives later will be consumed by execInShell's
+	// ReadString loop as noise before the actual command output.
 	deadline := time.After(timeout)
 	for {
+		if n := p.shellOut.Buffered(); n > 0 {
+			p.shellOut.Discard(n)
+			continue
+		}
 		select {
 		case <-deadline:
-			return nil
+			return
 		default:
-			// Peek without blocking — if nothing available, we're done
-			_, err := p.shellOut.Peek(1)
-			if err != nil {
-				return nil // no more data or EOF
-			}
-			// Drain one byte
-			_, _ = p.shellOut.Discard(1)
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
@@ -146,9 +151,10 @@ func (p *ADBProvider) execInShell(command string) (string, error) {
 		return "", fmt.Errorf("shell not open")
 	}
 
-	// Build the command with an EOF marker on a dedicated line.
-	// Using printf for reliable marker echo.
-	fullCmd := fmt.Sprintf("%s\nprintf '\\n%s\\n'\\n", command, shellEOFMaker)
+	// Send the command followed by an EOF marker on its own line.
+	// printf interprets \n as newline (even inside single quotes in bash/sh),
+	// so the marker is echoed as a standalone line for ReadString to detect.
+	fullCmd := fmt.Sprintf("%s\nprintf '\\n%s\\n'\n", command, shellEOFMaker)
 
 	_, err := io.WriteString(p.shellIn, fullCmd)
 	if err != nil {

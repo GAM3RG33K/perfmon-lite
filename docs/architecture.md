@@ -248,6 +248,7 @@ type TelemetryProvider interface {
 | `internal/platform/mock/mock_test.go` | 15 tests + 1 benchmark | Provider: deterministic output, different seeds, valid ranges, sinusoidal variation, step increment, PID ignored, memory leak after 100, leak cap, thread variation, copy semantics, close. Static helpers: MockDevice, MockProcess. BenchmarkSample |
 | `internal/platform/android/provider_test.go` | 50 tests | Discovery: empty/headers/emulators/physical/offline/unauthorized. Process: empty/header-only/app/kernel-threads/multiple. BuildType: debuggable/release/alt-format/empty. Telemetry: CPU found/not-found/empty/zero/varied, VmRSS found/not-found/empty/zero, Threads found/not-found/empty/many. Preflight: version parse/no-match/empty/string. Provider: new/set-device/adb-command/close/interfaces/AdbError |
 | `internal/platform/android/pipe_test.go` | 11 tests | Pipe: ensureShell opens/closes, idempotent, simple command, multiple commands, reconnects after close, Close cleanup. Sample: fake PID error, no device error, SetDevice edge cases (empty, reopen). Concurrency: 10 concurrent Sample calls, 20 concurrent SetDevice calls, Close idempotent |
+| `internal/platform/android/adb_integration_test.go` | 13 tests | **Integration tests** (build tag: `adb_test`): ADB binary discovery, version check, device discovery, process mapping, build type detection (systemui + non-existent), sample init/system_server/non-existent PID, consecutive samples, persistent shell pipe echo + multi-command, pipe fallback after kill, full end-to-end flow (discover→select→map→buildtype→sample→close), 10 concurrent samples |
 
 ### Test Properties
 
@@ -261,9 +262,18 @@ type TelemetryProvider interface {
 ```bash
 make test              # Full suite with race detector + coverage
 make test-short        # Quick run without race detector
+make test-adb          # ADB integration tests (requires connected device/emulator)
 go test -v ./internal/engine/          # Engine tests only
 go test -v ./internal/platform/mock/   # Mock provider tests only
+go test -tags=adb_test -v ./internal/platform/android/  # ADB integration tests
 ```
+
+### Integration Test Notes
+
+- **Build tag:** `adb_test` — excluded from normal `go test ./...` runs
+- **Prerequisite:** A connected ADB device (physical or emulator) with `adb` in PATH
+- **Skip behavior:** Tests skip gracefully with `t.Skip()` when no ADB device is connected
+- **Tested device:** `emulator-5554` (Android emulator, API 34+)
 
 ### Verification Commands
 

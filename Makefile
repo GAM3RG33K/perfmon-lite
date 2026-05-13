@@ -23,6 +23,10 @@ test: ## Run all tests
 test-short: ## Run tests without race detector (faster)
 	go test -v -short ./...
 
+test-adb: ## Run ADB integration tests (requires real device/emulator)
+	@echo "=== ADB Integration Tests ==="
+	go test -tags=adb_test -v -race -count=1 ./internal/platform/android/
+
 lint: ## Run golangci-lint
 	golangci-lint run ./... 2>/dev/null || echo "golangci-lint not installed, running go vet instead" && go vet ./...
 
