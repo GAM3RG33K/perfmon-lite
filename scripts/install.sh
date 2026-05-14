@@ -1,8 +1,10 @@
 #!/bin/bash
 # perfmon — install.sh
 # Downloads the latest release binary for your OS/arch and installs it.
-# Usage: curl -sfL https://perfmon.qzz.io | bash
-#   or:  ./scripts/install.sh [--prefix /usr/local]
+# Usage:
+#   macOS/Linux: curl -sfL https://perfmon.qzz.io | bash
+#   Windows:     iwr https://perfmon.qzz.io/windows -useb | iex
+#   or:          ./scripts/install.sh [--prefix /usr/local]
 
 set -euo pipefail
 
