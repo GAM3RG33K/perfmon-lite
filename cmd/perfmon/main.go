@@ -53,6 +53,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage:\n")
 		fmt.Fprintf(os.Stderr, "  perfmon [flags]\n")
 		fmt.Fprintf(os.Stderr, "  perfmon devices [flags]\n")
+		fmt.Fprintf(os.Stderr, "  perfmon uninstall\n")
 		fmt.Fprintf(os.Stderr, "\nFlags:\n")
 		flag.PrintDefaults()
 	}
