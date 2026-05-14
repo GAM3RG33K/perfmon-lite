@@ -53,6 +53,7 @@ jobs:
   # ─── Cross-platform Build ─────────────────────────────────────────────
   cross-build:
     name: Cross-platform Build
+    if: github.event_name != 'push' || github.ref_name != 'main'
     needs: [build-and-test]
     runs-on: ubuntu-latest
     strategy:
@@ -91,6 +92,7 @@ jobs:
   # ─── ADB Integration Tests (Android emulator) ─────────────────────────
   adb-integration:
     name: ADB Integration Tests
+    if: github.event_name != 'push' || github.ref_name != 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
