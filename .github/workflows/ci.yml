@@ -9,6 +9,7 @@ on:
 
 env:
   GO_VERSION: "1.26"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ─── Build, Vet & Unit Tests ──────────────────────────────────────────
@@ -193,7 +194,7 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
+          version: '~> v2'
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
