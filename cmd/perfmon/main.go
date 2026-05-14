@@ -297,16 +297,22 @@ func main() {
 		model.Logs.AddEntry("INFO", "Android mode — live device telemetry")
 	}
 
-	// Build options
-	teaOpts := []tea.ProgramOption{
-		tea.WithAltScreen(),       // Use alternate screen buffer
-		tea.WithMouseCellMotion(), // Enable mouse support
+	// Start TUI with mouse support. If it fails (e.g., Windows CMD, SSH),
+	// retry without mouse support.
+	runTUI := func(mouse bool) error {
+		opts := []tea.ProgramOption{tea.WithAltScreen()}
+		if mouse {
+			opts = append(opts, tea.WithMouseCellMotion())
+		}
+		p := tea.NewProgram(model, opts...)
+		_, err := p.Run()
+		return err
 	}
 
-	p := tea.NewProgram(model, teaOpts...)
-
-	if _, err := p.Run(); err != nil {
-		log.Fatalf("Error running TUI: %v", err)
+	if err := runTUI(true); err != nil {
+		if err := runTUI(false); err != nil {
+			log.Fatalf("Error running TUI: %v", err)
+		}
 	}
 }
 
