@@ -23,9 +23,9 @@ A blistering-fast, standalone, terminal-based mobile app profiler that provides 
 | `--mock` | | | `false` | Run with simulated telemetry data (no device required). Useful for UI development and demos |
 | `--ios` | | | `false` | Force iOS mode (use xcrun instead of ADB auto-detection) |
 | `--target` | `-t` | `string` | `""` | Specify target device/app (e.g., `emulator-5554`, `Pixel8`, `com.example.app`) |
-| `--interval` | `-i` | `int` | `1` | Polling interval in seconds. Range: 1-60 |
-| `--output` | `-o` | `string` | `"./perfmon_export"` | Output path for export file (without extension) |
-| `--buffer` | `-b` | `int` | `300` | Ring buffer capacity (number of data points kept in memory) |
+| `--interval` | | `int` | `1` (or `$PERFMON_POLL_INTERVAL`) | Polling interval in seconds. Range: 1-60 |
+| `--output` | | `string` | `"./perfmon_export"` (or `$PERFMON_EXPORT_DIR`) | Output path for export file (without extension) |
+| `--buffer` | | `int` | `300` (or `$PERFMON_BUFFER_SIZE`) | Ring buffer capacity (number of data points kept in memory) |
 | `--export` | | `string` | `""` | Export format for non-interactive mode: `json`, `md`, `html`, `pdf` |
 | `--verbose` | `-V` | | `false` | Enable verbose logging to stderr |
 | `--help` | `-h` | | `false` | Show help message and exit |
@@ -54,21 +54,24 @@ perfmon devices [flags]
 **Example output:**
 
 ```
-┌─────────────────────────────────────────────┐
-│ Available Devices                            │
-├─────────────────────────────────────────────┤
-│ ANDROID                                      │
-│  • emulator-5554  Pixel 7 API 34  (emulator) │
-│  • RF8M21M6DEF    Pixel 8         (physical) │
-├─────────────────────────────────────────────┤
-│ iOS                                           │
-│  • D0A1E2C3-...   iPhone 16 Pro  (simulator) │
-│  • A1B2C3D4-...   iPad Air M2    (simulator) │
-├─────────────────────────────────────────────┤
-│ Apps (com.example.app [DEBUG])               │
-│  • com.example.android  v3.2.1  [RELEASE]   │
-│  • com.example.debug    v1.0.0  [DEBUG]     │
-└─────────────────────────────────────────────┘
+$ perfmon devices
+Available Devices:
+──────────────────────────────
+  • emulator-5554  sdk_gphone16k_arm64  (android, emulator)
+  • F39098E7-...   iPhone 17 Pro        (ios, simulator)
+
+$ perfmon devices --json --platform android
+[
+  {
+    "device": {
+      "id": "emulator-5554",
+      "name": "sdk_gphone16k_arm64",
+      "platform": "android",
+      "is_physical": false,
+      "is_booted": true
+    }
+  }
+]
 ```
 
 ---
@@ -209,24 +212,24 @@ perfmon devices --platform android --json
 
 ## 6. Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| `0` | Success |
-| `1` | General error (invalid flags, runtime failure) |
-| `2` | Device not found / unreachable |
-| `3` | ADB or xcrun not found / not configured |
-| `4` | Export failed (write error, template error) |
+| Code | Meaning | Used When |
+|------|---------|-----------|
+| `0` | Success | Normal exit, `--version`, `--help` |
+| `1` | General error | Invalid flags, runtime failure, no telemetry data |
+| `2` | Device error | *(reserved for future use)* |
+| `3` | Tool not configured | ADB not found, xcrun not found, no devices, no processes |
+| `4` | Export failed | Write error, directory creation failure |
 
 ---
 
 ## 7. Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PERFMON_ADB_PATH` | Path to `adb` executable | Auto-detected from `PATH` or `$ANDROID_HOME` |
-| `PERFMON_BUFFER_SIZE` | Ring buffer data point capacity | `300` |
-| `PERFMON_POLL_INTERVAL` | Default polling interval in seconds | `1` |
-| `PERFMON_EXPORT_DIR` | Default export directory | `./` |
+| Variable | Description | Default | Status |
+|----------|-------------|---------|--------|
+| `PERFMON_ADB_PATH` | Path to `adb` executable (checked before PATH and ANDROID_HOME) | Auto-detected | ✅ Implemented |
+| `PERFMON_BUFFER_SIZE` | Ring buffer data point capacity | `300` | ✅ Implemented |
+| `PERFMON_POLL_INTERVAL` | Default polling interval in seconds | `1` | ✅ Implemented |
+| `PERFMON_EXPORT_DIR` | Default export directory / output path | `./perfmon_export` | ✅ Implemented |
 
 ---
 
@@ -247,24 +250,7 @@ perfmon version [--json]
 
 ---
 
-## 9. Shell Completion *(Planned)*
-
-Shell completion is a planned enhancement for future releases:
-
-```bash
-# Bash
-source <(perfmon completion bash)
-
-# Zsh
-source <(perfmon completion zsh)
-
-# Fish
-perfmon completion fish | source
-```
-
----
-
-## 10. Common Workflows
+## 9. Common Workflows
 
 ### Quick check — mock mode
 

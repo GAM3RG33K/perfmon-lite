@@ -239,8 +239,8 @@ type TelemetryProvider interface {
 
 | Constraint | Target | Current Status |
 |------------|--------|----------------|
-| Binary size | < 20 MB (stripped release build) | ~4.7 MB (arm64, unstripped) |
-| Host CPU overhead | < 2% during profiling | Not yet measured |
+| Binary size | < 20 MB (stripped release build) | 5.5 MB (darwin/arm64, stripped) |
+| Host CPU overhead | < 2% during profiling | ✅ Measured 0–0.1% |
 | Polling interval | 1 second (configurable via `--interval`) | ✅ Configurable |
 | Ring buffer capacity | 300 data points (configurable via `--buffer`) | ✅ Configurable |
 | Export formats | JSON, Markdown, HTML, PDF | ✅ All 4 formats implemented |

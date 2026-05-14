@@ -37,6 +37,8 @@ perfmon
 perfmon --mock --export html --output ./report
 ```
 
+> **Windows users:** replace `perfmon` with `perfmon-tool` in all commands.
+
 ---
 
 ## Features
@@ -60,22 +62,24 @@ perfmon --mock --export html --output ./report
 
 ## Installation
 
-### macOS (Homebrew)
+### One-liner install
 
+**macOS / Linux:**
 ```bash
-# Coming soon — tap repo
-# brew install w1n/tap/perfmon
+curl -sfL https://perfmon.qzz.io | bash
 ```
 
-### Go install
-
-```bash
-go install github.com/w1n/perfmon/cmd/perfmon@latest
+**Windows (PowerShell):**
+```powershell
+iwr https://perfmon.qzz.io/windows -useb | iex
 ```
 
-### Download a release
+> On macOS you may need to add `~/.local/bin` to your PATH.
+> On Windows, the installer adds `%LOCALAPPDATA%\perfmon` to your user PATH — restart your terminal.
 
-Download the latest binary from the [Releases page](https://github.com/GAM3RG33K/perfmon-lite/releases) for your platform:
+### Manual download
+
+Download the latest binary from the [Releases page](https://github.com/GAM3RG33K/perfmon-lite/releases).
 
 | Platform | Binary |
 |----------|--------|
@@ -83,7 +87,8 @@ Download the latest binary from the [Releases page](https://github.com/GAM3RG33K
 | macOS (Apple Silicon) | `perfmon_darwin_arm64` |
 | Linux (x86_64) | `perfmon_linux_amd64` |
 | Linux (ARM64) | `perfmon_linux_arm64` |
-| Windows (x86_64) | `perfmon_windows_amd64.exe` |
+| Windows (x86_64) | `perfmon-tool_windows_amd64.exe` |
+| Windows (ARM64) | `perfmon-tool_windows_arm64.exe` |
 
 ### Prerequisites
 
@@ -166,7 +171,9 @@ perfmon --mock --export pdf           # → ./perfmon_export.pdf
 | [CLI Reference](docs/cli-reference.md) | Full flag reference, commands, exit codes, environment variables |
 | [Development Plan](docs/plan.md) | Phased implementation plan with task tracking |
 | [Checklist](docs/checklist.md) | Detailed progress checklist across all phases |
+| [Gap Analysis](docs/GAP_TO_FILL.md) | Known issues and pending improvements |
 | [PRD](PRD.md) | Full product requirements document |
+| [Domain Setup](docs/domain-setup.md) | Cloudflare + DNS configuration guide |
 
 ---
 
@@ -187,7 +194,17 @@ make test-short         # Quick run (no race detector)
 make test-adb
 
 # Cross-compile for all platforms
-make release
+make cross-build
+
+# Create a release tag and push (triggers CI release build)
+make cut-release
+
+# Re-tag to trigger a new CI release build (deletes existing tag)
+make retag
+
+# Install/update from latest GitHub release
+make install             # macOS/Linux only
+make update              # macOS/Linux only
 
 # Clean build artifacts
 make clean
@@ -213,11 +230,11 @@ internal/
 |---------|-------|--------|
 | Engine + Types | 27 | ✅ |
 | Mock Provider | 15 + 1 benchmark | ✅ |
-| Android Provider | 61 | ✅ |
-| iOS Provider | 30+ | ✅ |
+| Android Provider | 59 | ✅ |
+| iOS Provider | 34 | ✅ |
 | Export Subsystem | 35 | ✅ |
 | ADB Integration | 13 | ✅ (build tag: `adb_test`) |
-| **Total** | **~181** | ✅ All pass with `-race` |
+| **Total** | **~183** | ✅ All pass with `-race` |
 
 ---
 
