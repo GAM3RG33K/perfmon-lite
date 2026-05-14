@@ -16,17 +16,25 @@ A blistering-fast, standalone, terminal-based mobile app profiler that provides 
 
 ---
 
-## 2. Global Flags
+## 2. Commands
+
+| Command | Description |
+|---------|-------------|
+| `perfmon [flags]` | Launch interactive TUI (auto-detect platform) |
+| `perfmon devices [flags]` | List connected devices and simulators |
+| `perfmon uninstall` | Remove perfmon binary from system |
+
+## 3. Global Flags
 
 | Flag | Shorthand | Type | Default | Description |
 |------|-----------|------|---------|-------------|
-| `--mock` | | | `false` | Run with simulated telemetry data (no device required). Useful for UI development and demos |
-| `--ios` | | | `false` | Force iOS mode (use xcrun instead of ADB auto-detection) |
-| `--target` | `-t` | `string` | `""` | Specify target device/app (e.g., `emulator-5554`, `Pixel8`, `com.example.app`) |
+| `--mock` | | | `false` | Run with simulated telemetry data (no device required) |
+| `--device` | `-d` | `string` | `""` | Target device by serial/UUID (e.g. `emulator-5554`) |
+| `--id` | | `string` | `""` | Target app by package name or bundle ID (e.g. `com.example.app`) |
 | `--interval` | | `int` | `1` (or `$PERFMON_POLL_INTERVAL`) | Polling interval in seconds. Range: 1-60 |
 | `--output` | | `string` | `"./perfmon_export"` (or `$PERFMON_EXPORT_DIR`) | Output path for export file (without extension) |
 | `--buffer` | | `int` | `300` (or `$PERFMON_BUFFER_SIZE`) | Ring buffer capacity (number of data points kept in memory) |
-| `--export` | | `string` | `""` | Export format for non-interactive mode: `json`, `md`, `html`, `pdf` |
+| `--export` | | `string` | `""` | Export format: `json`, `md`, `html` |
 | `--verbose` | `-V` | | `false` | Enable verbose logging to stderr |
 | `--help` | `-h` | | `false` | Show help message and exit |
 | `--version` | `-v` | | `false` | Show version information and exit |
@@ -55,10 +63,10 @@ perfmon devices [flags]
 
 ```
 $ perfmon devices
-Available Devices:
-──────────────────────────────
-  • emulator-5554  sdk_gphone16k_arm64  (android, emulator)
-  • F39098E7-...   iPhone 17 Pro        (ios, simulator)
+DEVICE ID               NAME                            PLATFORM      TYPE
+────────────────────────────────────────────────────────────────────────────
+  emulator-5554         sdk_gphone16k_arm64             android       emulator
+  F39098E7-...          iPhone 17 Pro                   ios           simulator
 
 $ perfmon devices --json --platform android
 [
@@ -108,7 +116,7 @@ Press `e` (JSON), `Shift+E` (Markdown), or `Ctrl+E` (HTML) during a live session
 perfmon --mock --export json
 perfmon --mock --export md --output ./reports/session-001
 perfmon --mock --export html --output ./reports/perf-report
-perfmon --export pdf --target emulator-5554
+perfmon --device emulator-5554 --id in.thetatva.tatva --export json
 
 # Interactive mode (press e/E/Ctrl+E inside TUI)
 perfmon
@@ -149,17 +157,17 @@ When running `perfmon` without a command (or with `--mock`), the interactive TUI
 
 | Key | Action |
 |-----|--------|
-| `↑` / `↓` | Navigate lists (devices, processes, tabs) |
-| `←` / `→` | Switch between tabs (Dashboard, Threads/Procs, System Logs) |
-| `Tab` | Cycle forward through tabs |
-| `Shift+Tab` | Cycle backward through tabs |
+| `↑` / `↓` | Navigate lists |
+| `←` / `→` | Switch tabs |
+| `Tab` / `Shift+Tab` | Cycle tabs |
+| `1`–`3` | Jump to tab by number |
 | `Enter` | Select highlighted item |
-| `/` | Enter search/filter mode |
-| `Esc` | Exit search mode / close panel |
 | `r` | Refresh device list |
-| `e` | Export current telemetry data (prompts for format: `json`, `md`, `html`, `pdf`) |
-| `q` / `Ctrl+C` | Quit perfmon |
-| `?` | Toggle help overlay |
+| `e` | Export to JSON |
+| `Shift+E` | Export to Markdown |
+| `Ctrl+E` | Export to HTML |
+| `?` | Toggle full-screen help overlay |
+| `q` / `Ctrl+C` | Quit |
 
 ---
 
@@ -176,10 +184,10 @@ Starts the TUI dashboard with simulated sinusoidal CPU/memory/thread telemetry. 
 ### 5.2 Launch interactive TUI targeting a specific device
 
 ```bash
-perfmon --target emulator-5554
+perfmon --device emulator-5554
 ```
 
-Skips the device selection screen and immediately connects to `emulator-5554`.
+Skips the device selection screen and immediately connects to the specified device.
 
 ### 5.3 Launch with custom polling interval
 
@@ -226,26 +234,23 @@ perfmon devices --platform android --json
 
 | Variable | Description | Default | Status |
 |----------|-------------|---------|--------|
-| `PERFMON_ADB_PATH` | Path to `adb` executable (checked before PATH and ANDROID_HOME) | Auto-detected | ✅ Implemented |
-| `PERFMON_BUFFER_SIZE` | Ring buffer data point capacity | `300` | ✅ Implemented |
-| `PERFMON_POLL_INTERVAL` | Default polling interval in seconds | `1` | ✅ Implemented |
-| `PERFMON_EXPORT_DIR` | Default export directory / output path | `./perfmon_export` | ✅ Implemented |
+| `PERFMON_ADB_PATH` | Path to `adb` executable | Auto-detected | ✅ |
+| `PERFMON_BUFFER_SIZE` | Ring buffer capacity | `300` | ✅ |
+| `PERFMON_POLL_INTERVAL` | Polling interval in seconds | `1` | ✅ |
+| `PERFMON_EXPORT_DIR` | Output path for exports | `./perfmon_export` | ✅ |
 
 ---
 
 ## 8. Complete Command Tree
 
 ```
-perfmon [--mock] [--target <device>] [--interval <n>] [--buffer <n>]
-       [--output <path>] [--verbose]
+perfmon [--mock] [--device <id>] [--id <app>] [--interval <n>]
+       [--buffer <n>] [--output <path>] [--verbose]
        [--help | -h] [--version | -v]
 
 perfmon devices [--json] [--platform <p>] [--build-info]
 
-perfmon export <format> [--output <path>] [--pretty]
-       <format> := json | md | html | pdf
-
-perfmon version [--json]
+perfmon uninstall
 ```
 
 ---
@@ -259,23 +264,29 @@ perfmon --mock
 # → See live animated telemetry immediately
 ```
 
-### Profile a real Android app
+### Profile a specific app
 
 ```bash
 # Step 1: List connected devices
 perfmon devices
 
-# Step 2: Connect and profile
-perfmon --target emulator-5554
+# Step 2: Connect and profile by device
+perfmon --device emulator-5554
+
+# Or target a specific app by package name
+perfmon --id in.thetatva.tatva
+
+# Or combine device + app
+perfmon --device emulator-5554 --id in.thetatva.tatva
 
 # Step 3: Press 'e' to export during session
-# or after exiting, run:
-perfmon export json --output ./results/my-profile
+# or use --export for non-interactive export:
+perfmon --id in.thetatva.tatva --export json
 ```
 
 ### Headless export for CI/CD
 
 ```bash
 perfmon devices --json | jq '.[] | select(.platform == "android") | .id'
-perfmon --target <device_id> export json
+perfmon --device <device_id> --export json
 ```

@@ -46,12 +46,12 @@ perfmon --mock --export html --output ./report
 | Feature | Android | iOS |
 |---------|---------|-----|
 | Device discovery | ✅ `adb devices -l` | ✅ `xcrun simctl list` + `devicectl` |
-| Process mapping | ✅ `adb shell ps` | ✅ `launchctl list` / `ps -A` |
-| CPU sampling | ✅ `adb shell top` | ✅ `simctl spawn ... top` |
-| Memory sampling | ✅ `/proc/<pid>/status` (VmRSS) | ✅ `top` / `ps` RSS |
-| Thread counting | ✅ `/proc/<pid>/status` (Threads) | ✅ `top` (#TH) |
+| Process mapping | ✅ `adb shell ps` | ✅ `launchctl list` |
+| CPU sampling | ✅ `/proc/<pid>/stat` (tick delta) | ✅ macOS `ps` (host-level) |
+| Memory sampling | ✅ `/proc/<pid>/status` (VmRSS) | ✅ macOS `ps` (RSS) |
+| Thread counting | ✅ `/proc/<pid>/status` (Threads) | ❌ (not available on iOS) |
 | Build type detection | ✅ `dumpsys package` (DEBUGGABLE) | ✅ `_CodeSignature` + entitlements |
-| Persistent shell pipe | ✅ Single `adb shell` connection | N/A (uses xcrun per-command) |
+| Persistent shell pipe | ✅ Single `adb shell` connection | N/A (uses macOS host tools) |
 | **Export formats** | **All platforms** |
 | JSON export | ✅ Structured data (PRD schema v1) |
 | Markdown export | ✅ Report with ASCII sparklines + tables |
@@ -76,6 +76,18 @@ iwr https://perfmon.qzz.io/windows -useb | iex
 
 > On macOS you may need to add `~/.local/bin` to your PATH.
 > On Windows, the installer adds `%LOCALAPPDATA%\perfmon` to your user PATH — restart your terminal.
+
+### One-liner uninstall
+
+**macOS / Linux:**
+```bash
+curl -sfL https://perfmon.qzz.io/uninstall | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+iwr https://perfmon.qzz.io/uninstall/windows -useb | iex
+```
 
 ### Manual download
 
@@ -102,11 +114,14 @@ Download the latest binary from the [Releases page](https://github.com/GAM3RG33K
 ### Interactive TUI
 
 ```bash
-# Auto-detect platform (Android first, then iOS on macOS)
+# Auto-detect platform (Android → iOS on macOS)
 perfmon
 
-# Force iOS mode
-perfmon --ios
+# Target a specific device
+perfmon --device emulator-5554
+
+# Target a specific app by package/bundle ID
+perfmon --id in.thetatva.tatva
 
 # Force mock mode for development
 perfmon --mock
@@ -122,13 +137,14 @@ perfmon --interval 2 --buffer 600
 | `↑` / `↓` | Navigate lists |
 | `←` / `→` | Switch tabs |
 | `Tab` | Cycle forward through tabs |
+| `1`–`3` | Jump to tab by number |
 | `Enter` | Select highlighted item |
 | `e` | Export to JSON |
 | `Shift+E` | Export to Markdown |
 | `Ctrl+E` | Export to HTML |
 | `r` | Refresh device list |
+| `?` | Toggle full-screen help overlay |
 | `q` / `Ctrl+C` | Quit |
-| `?` | Help overlay |
 
 ### Non-interactive Export
 
@@ -142,8 +158,8 @@ perfmon --mock --export md --output ./reports/session-001
 # Export to HTML
 perfmon --mock --export html --output ./reports/perf-report
 
-# Export to PDF (requires connection to real device)
-perfmon --target emulator-5554 --export pdf --output ./results
+# Target specific device and app for export
+perfmon --device emulator-5554 --id in.thetatva.tatva --export json
 
 # Default paths
 perfmon --mock --export json          # → ./perfmon_export.json
