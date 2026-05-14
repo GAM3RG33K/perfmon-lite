@@ -45,8 +45,9 @@ type Model struct {
 	statusMsg  string
 	statusTime time.Time
 
-	// Export format selection state
-	awaitingFormat bool
+	// Export format picker state
+	showFormatPicker bool
+	formatPickerIdx  int
 }
 
 func NewModel(eng *engine.Engine, mock bool, platform engine.Platform) *Model {
@@ -123,9 +124,9 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// If awaiting format selection, only handle format keys
-	if m.awaitingFormat {
-		return m.handleFormatKey(msg)
+	// If format picker is open, handle navigation
+	if m.showFormatPicker {
+		return m.handlePickerKey(msg)
 	}
 
 	switch msg.String() {
@@ -194,44 +195,14 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.setStatus(" No data to export yet")
 			return m, nil
 		}
-		m.awaitingFormat = true
-		m.setStatus(" Export format: (j)son  (m)d  (h)tml  (c)ancel")
+		m.showFormatPicker = true
+		m.formatPickerIdx = 0
 		return m, nil
 
-	case "j":
-		if !m.awaitingFormat {
-			break
-		}
-		m.awaitingFormat = false
-		return m.runExport(export.FormatJSON)
-
-	case "m":
-		if !m.awaitingFormat {
-			break
-		}
-		m.awaitingFormat = false
-		return m.runExport(export.FormatMD)
-
-	case "h":
-		if !m.awaitingFormat {
-			break
-		}
-		m.awaitingFormat = false
-		return m.runExport(export.FormatHTML)
-
-	case "c", "esc":
-		if m.awaitingFormat {
-			m.awaitingFormat = false
-			m.setStatus(" Export cancelled")
-			return m, nil
-		}
-
 	case "E":
-		m.awaitingFormat = false
 		return m.runExport(export.FormatMD)
 
 	case "ctrl+e":
-		m.awaitingFormat = false
 		return m.runExport(export.FormatHTML)
 
 	case "?":
@@ -252,24 +223,26 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleFormatKey processes keys during export format selection.
-func (m *Model) handleFormatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+// handlePickerKey processes keys during export format selection.
+var pickerFormats = []export.Format{export.FormatJSON, export.FormatMD, export.FormatHTML}
+var pickerLabels = []string{"JSON", "Markdown", "HTML"}
+
+func (m *Model) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "j":
-		m.awaitingFormat = false
-		return m.runExport(export.FormatJSON)
-	case "m":
-		m.awaitingFormat = false
-		return m.runExport(export.FormatMD)
-	case "h":
-		m.awaitingFormat = false
-		return m.runExport(export.FormatHTML)
-	case "c", "esc", "q", "enter":
-		m.awaitingFormat = false
+	case "up", "left":
+		m.formatPickerIdx = (m.formatPickerIdx - 1 + len(pickerFormats)) % len(pickerFormats)
+		return m, nil
+	case "down", "right":
+		m.formatPickerIdx = (m.formatPickerIdx + 1) % len(pickerFormats)
+		return m, nil
+	case "enter":
+		m.showFormatPicker = false
+		return m.runExport(pickerFormats[m.formatPickerIdx])
+	case "esc", "q", "ctrl+c":
+		m.showFormatPicker = false
 		m.setStatus(" Export cancelled")
 		return m, nil
 	}
-	// Ignore other keys during format selection
 	return m, nil
 }
 
@@ -328,6 +301,9 @@ func (m *Model) View() string {
 
 	if m.ShowHelp {
 		return m.renderHelp()
+	}
+	if m.showFormatPicker {
+		return m.renderFormatPicker()
 	}
 
 	var b strings.Builder
@@ -388,6 +364,35 @@ func (m *Model) View() string {
 	// Footer
 	b.WriteString(m.renderFooter())
 
+	return b.String()
+}
+
+// renderFormatPicker shows a modal overlay for selecting export format.
+func (m *Model) renderFormatPicker() string {
+	var b strings.Builder
+	b.WriteString("\n\n\n")
+	b.WriteString(styles.HelpTitle.Render("  Select export format"))
+	b.WriteString("\n\n")
+
+	for i, label := range pickerLabels {
+		prefix := "  "
+		cursor := " "
+		if i == m.formatPickerIdx {
+			prefix = "▸ "
+			cursor = "▸"
+			_ = cursor
+		}
+		line := prefix + label
+		if i == m.formatPickerIdx {
+			b.WriteString(styles.HighlightStyle.Render(line))
+		} else {
+			b.WriteString(styles.LabelStyle.Render(line))
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(styles.HelpFooter.Render("  ↑/↓ navigate  Enter select  Esc cancel"))
 	return b.String()
 }
 
@@ -460,15 +465,6 @@ func (m *Model) renderTabs() string {
 }
 
 func (m *Model) renderFooter() string {
-	if m.awaitingFormat {
-		prompt := " Export: (j)son  (m)d  (h)tml  (c)ancel"
-		footerWidth := m.Width - 2
-		if footerWidth < 20 {
-			footerWidth = 20
-		}
-		return styles.FooterStyle.Width(footerWidth).Render(prompt)
-	}
-
 	hints := []string{
 		"[↑/↓] Navigate",
 		"[←/→] Tabs",

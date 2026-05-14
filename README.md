@@ -139,9 +139,9 @@ perfmon --interval 2 --buffer 600
 | `Tab` | Cycle forward through tabs |
 | `1`–`3` | Jump to tab by number |
 | `Enter` | Select highlighted item |
-| `e` | Export to JSON |
-| `Shift+E` | Export to Markdown |
-| `Ctrl+E` | Export to HTML |
+| `e` | Open export format picker (↑↓ navigate, Enter confirm, Esc cancel) |
+| `Shift+E` | Export directly to Markdown |
+| `Ctrl+E` | Export directly to HTML |
 | `r` | Refresh device list |
 | `?` | Toggle full-screen help overlay |
 | `q` / `Ctrl+C` | Quit |
