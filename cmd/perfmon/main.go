@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -35,8 +36,9 @@ var version = "1.0.0"
 func main() {
 	// ── CLI flags ───────────────────────────────────────────────────────
 	mockMode := flag.Bool("mock", false, "Run with simulated telemetry data (no device required)")
-	deviceFlag := flag.String("device", "", "Specify target device (serial/UUID) or package name")
+	deviceFlag := flag.String("device", "", "Specify target device (serial/UUID)")
 	flag.StringVar(deviceFlag, "d", "", "Shorthand for --device")
+	appIDFlag := flag.String("id", "", "Target app by package name or bundle ID (e.g. com.example.app)")
 	intervalFlag := flag.Int("interval", envInt("PERFMON_POLL_INTERVAL", 1), "Polling interval in seconds (range: 1-60)")
 	bufferFlag := flag.Int("buffer", envInt("PERFMON_BUFFER_SIZE", 300), "Ring buffer capacity (number of data points)")
 	exportFlag := flag.String("export", "", "Export format: json, md, html")
@@ -59,9 +61,15 @@ func main() {
 
 	// Handle subcommands
 	args := flag.Args()
-	if len(args) > 0 && args[0] == "devices" {
-		runDevices(args[1:], *verboseFlag)
-		os.Exit(exitSuccess)
+	if len(args) > 0 {
+		switch args[0] {
+		case "devices":
+			runDevices(args[1:], *verboseFlag)
+			os.Exit(exitSuccess)
+		case "uninstall":
+			runUninstall()
+			return
+		}
 	}
 
 	// Handle version flag
@@ -101,7 +109,7 @@ func main() {
 		}
 	} else {
 		// ── Auto-detect: discover all platforms ───────────────────────
-		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform = autoDetectProvider(*deviceFlag, *verboseFlag)
+		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform = autoDetectProvider(*deviceFlag, *appIDFlag, *verboseFlag)
 	}
 
 	if provider == nil {
@@ -356,7 +364,8 @@ func tryAndroidProvider(adbPath string, verbose bool) (engine.TelemetryProvider,
 
 // autoDetectProvider discovers the best available platform (Android → iOS → mock).
 // If a deviceID is provided, it selects that specific device.
-func autoDetectProvider(deviceID string, verbose bool) (
+// If an appID is provided, it selects the process matching that package/bundle name.
+func autoDetectProvider(deviceID, appID string, verbose bool) (
 	provider engine.TelemetryProvider,
 	devices []engine.Device,
 	processes []engine.AppProcess,
@@ -369,6 +378,9 @@ func autoDetectProvider(deviceID string, verbose bool) (
 		androidErr = nil
 		if deviceID == "" || matchDevice(aDevs, deviceID) {
 			provider, devices, processes, pid, platform = aProv, aDevs, aProcs, aPID, aPlat
+			if appID != "" {
+				pid = matchProcess(processes, appID)
+			}
 			return
 		}
 	} else {
@@ -379,6 +391,9 @@ func autoDetectProvider(deviceID string, verbose bool) (
 	if iProv, iDevs, iProcs, iPID, iPlat, iErr := tryiOSProvider(verbose); iErr == nil {
 		if deviceID == "" || matchDevice(iDevs, deviceID) {
 			provider, devices, processes, pid, platform = iProv, iDevs, iProcs, iPID, iPlat
+			if appID != "" {
+				pid = matchProcess(processes, appID)
+			}
 			return
 		}
 	} else if androidErr != nil && verbose {
@@ -408,6 +423,9 @@ func autoDetectProvider(deviceID string, verbose bool) (
 	case "retry":
 		if aProv, aDevs, aProcs, aPID, aPlat, aErr := tryAndroidProvider("", verbose); aErr == nil {
 			provider, devices, processes, pid, platform = aProv, aDevs, aProcs, aPID, aPlat
+			if appID != "" {
+				pid = matchProcess(processes, appID)
+			}
 			return
 		} else if verbose {
 			log.Printf("Android still unavailable: %v", aErr)
@@ -415,6 +433,9 @@ func autoDetectProvider(deviceID string, verbose bool) (
 		// iOS fallback
 		if iProv, iDevs, iProcs, iPID, iPlat, iErr := tryiOSProvider(verbose); iErr == nil {
 			provider, devices, processes, pid, platform = iProv, iDevs, iProcs, iPID, iPlat
+			if appID != "" {
+				pid = matchProcess(processes, appID)
+			}
 			return
 		} else if verbose {
 			log.Printf("iOS also unavailable: %v", iErr)
@@ -437,6 +458,67 @@ func matchDevice(devices []engine.Device, id string) bool {
 		}
 	}
 	return false
+}
+
+// matchProcess finds a process by package name / bundle ID in the list.
+// Returns the PID of the first match, or 0 if not found.
+func matchProcess(processes []engine.AppProcess, appID string) int32 {
+	for _, p := range processes {
+		if strings.Contains(p.PackageName, appID) || p.PackageName == appID {
+			return p.PID
+		}
+	}
+	// Try Name field
+	for _, p := range processes {
+		if strings.Contains(p.Name, appID) || p.Name == appID {
+			return p.PID
+		}
+	}
+	return 0
+}
+
+// runUninstall removes the perfmon binary and cleans up.
+func runUninstall() {
+	fmt.Println("Uninstalling perfmon...")
+
+	// Common install locations
+	paths := []string{
+		"/usr/local/bin/perfmon",
+		filepath.Join(os.Getenv("HOME"), ".local", "bin", "perfmon"),
+	}
+	found := false
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			if err := os.Remove(p); err != nil {
+				fmt.Fprintf(os.Stderr, "  Failed to remove %s: %v\n", p, err)
+			} else {
+				fmt.Printf("  Removed %s\n", p)
+				found = true
+			}
+		}
+	}
+
+	// Windows locations (LOCALAPPDATA)
+	if local := os.Getenv("LOCALAPPDATA"); local != "" {
+		winPath := filepath.Join(local, "perfmon", "perfmon-tool.exe")
+		if _, err := os.Stat(winPath); err == nil {
+			if err := os.Remove(winPath); err != nil {
+				fmt.Fprintf(os.Stderr, "  Failed to remove %s: %v\n", winPath, err)
+			} else {
+				fmt.Printf("  Removed %s\n", winPath)
+				found = true
+			}
+			// Remove the directory too
+			os.Remove(filepath.Dir(winPath))
+		}
+	}
+
+	if !found {
+		fmt.Println("  perfmon not found in common locations.")
+		fmt.Println("  You may have installed it in a custom path — delete it manually.")
+		return
+	}
+	fmt.Println("  perfmon uninstalled successfully!")
 }
 
 // tryiOSProvider attempts to set up the iOS provider.
@@ -755,17 +837,18 @@ func runDevices(args []string, verbose bool) {
 	}
 
 	// Group by platform for display
-	fmt.Println("Available Devices:")
-	fmt.Println("──────────────────────────────")
+	fmt.Printf("%-22s  %-30s  %-12s  %s\n", "DEVICE ID", "NAME", "PLATFORM", "TYPE")
+	fmt.Println(strings.Repeat("─", 76))
 	for _, e := range entries {
 		typ := "emulator"
 		if e.Device.IsPhysical {
 			typ = "physical"
 		}
-		fmt.Printf("  • %s  %s  (%s, %s)\n", e.Device.ID, e.Device.Name, e.Device.Platform, typ)
+		fmt.Printf("  %-20s  %-30s  %-12s  %s\n", e.Device.ID, e.Device.Name, e.Device.Platform, typ)
 		if buildInfo && len(e.Processes) > 0 {
+			fmt.Printf("  %-20s  %-30s  %-12s  %s\n", "", "Processes:", "", "")
 			for _, p := range e.Processes {
-				fmt.Printf("      PID %d — %s [%s]\n", p.PID, p.PackageName, p.BuildType)
+				fmt.Printf("  %-20s  %-30s  PID %-6d  [%s]\n", "", p.PackageName, p.PID, p.BuildType)
 			}
 		}
 	}

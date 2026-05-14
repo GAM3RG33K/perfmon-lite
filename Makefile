@@ -76,6 +76,9 @@ install: ## Download latest release binary for your OS/arch and install it
 update: ## Check for newer version and upgrade if available
 	@scripts/update.sh
 
+uninstall: ## Remove perfmon from common install locations
+	@scripts/uninstall.sh
+
 run: ## Run without mock mode
 	go run ./cmd/perfmon/
 
