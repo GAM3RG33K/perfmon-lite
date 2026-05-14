@@ -132,7 +132,14 @@ func main() {
 
 	if *exportFlag != "" {
 		fmt.Printf("Sampling telemetry...\n")
-		sampleCount := 10
+		// Collect up to half the buffer or 60 samples, whichever is smaller
+		sampleCount := *bufferFlag / 2
+		if sampleCount < 5 {
+			sampleCount = 5
+		}
+		if sampleCount > 60 {
+			sampleCount = 60
+		}
 		for i := 0; i < sampleCount; i++ {
 			msg := eng.Poll()
 			if tm, ok := msg.(engine.TelemetryMsg); ok && tm.Error == nil {
