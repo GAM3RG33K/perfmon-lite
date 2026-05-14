@@ -1,4 +1,4 @@
-.PHONY: build cross-build run mock test test-short test-adb lint fmt clean tidy dev all release github-release hooks
+.PHONY: build cross-build run mock test test-short test-adb lint fmt clean tidy dev all release github-release hooks cut-release retag install update
 
 APP_NAME := perfmon
 GO_FLAGS := -ldflags="-s -w"
@@ -70,6 +70,12 @@ cut-release: ## Create and push a release tag from the current version
 
 retag: ## Delete existing tag and re-tag to trigger a new CI release build
 	@scripts/release.sh --retag
+
+install: ## Download latest release binary for your OS/arch and install it
+	@scripts/install.sh
+
+update: ## Check for newer version and upgrade if available
+	@scripts/update.sh
 
 run: ## Run without mock mode
 	go run ./cmd/perfmon/
