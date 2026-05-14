@@ -65,6 +65,9 @@ release: cross-build ## Build all binaries and create a GitHub Release (requires
 
 github-release: release ## Alias for release
 
+cut-release: ## Create and push a release tag from the current version
+	@scripts/release.sh
+
 run: ## Run without mock mode
 	go run ./cmd/perfmon/
 
