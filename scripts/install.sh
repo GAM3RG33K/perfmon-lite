@@ -1,7 +1,7 @@
 #!/bin/bash
 # perfmon — install.sh
 # Downloads the latest release binary for your OS/arch and installs it.
-# Usage: curl -sfL https://github.com/GAM3RG33K/perfmon-lite/releases/latest/download/install.sh | bash
+# Usage: curl -sfL https://raw.githubusercontent.com/GAM3RG33K/perfmon-lite/main/scripts/install.sh | bash
 #   or:  ./scripts/install.sh [--prefix /usr/local]
 
 set -euo pipefail
