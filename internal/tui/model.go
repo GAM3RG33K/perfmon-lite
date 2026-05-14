@@ -44,6 +44,9 @@ type Model struct {
 	ShowHelp   bool
 	statusMsg  string
 	statusTime time.Time
+
+	// Export format selection state
+	awaitingFormat bool
 }
 
 func NewModel(eng *engine.Engine, mock bool, platform engine.Platform) *Model {
@@ -120,6 +123,11 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// If awaiting format selection, only handle format keys
+	if m.awaitingFormat {
+		return m.handleFormatKey(msg)
+	}
+
 	switch msg.String() {
 
 	case "q", "ctrl+c":
@@ -182,37 +190,49 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "e":
-		path, err := m.exportCurrentData(export.FormatJSON)
-		if err != nil {
-			m.Logs.AddEntry("ERROR", fmt.Sprintf("Export failed: %v", err))
-			m.setStatus(styles.ErrorStyle.Render("✗ Export failed"))
-		} else {
-			m.Logs.AddEntry("INFO", fmt.Sprintf("Exported to %s", path))
-			m.setStatus(fmt.Sprintf("✓ Exported to %s", path))
+		if m.Engine.Buffer.Count() == 0 {
+			m.setStatus(" No data to export yet")
+			return m, nil
 		}
+		m.awaitingFormat = true
+		m.setStatus(" Export format: (j)son  (m)d  (h)tml  (c)ancel")
 		return m, nil
+
+	case "j":
+		if !m.awaitingFormat {
+			break
+		}
+		m.awaitingFormat = false
+		return m.runExport(export.FormatJSON)
+
+	case "m":
+		if !m.awaitingFormat {
+			break
+		}
+		m.awaitingFormat = false
+		return m.runExport(export.FormatMD)
+
+	case "h":
+		if !m.awaitingFormat {
+			break
+		}
+		m.awaitingFormat = false
+		return m.runExport(export.FormatHTML)
+
+	case "c", "esc":
+		if m.awaitingFormat {
+			m.awaitingFormat = false
+			m.setStatus(" Export cancelled")
+			return m, nil
+		}
 
 	case "E":
-		path, err := m.exportCurrentData(export.FormatMD)
-		if err != nil {
-			m.Logs.AddEntry("ERROR", fmt.Sprintf("Export failed: %v", err))
-			m.setStatus(styles.ErrorStyle.Render("✗ Export failed"))
-		} else {
-			m.Logs.AddEntry("INFO", fmt.Sprintf("Exported to %s", path))
-			m.setStatus(fmt.Sprintf("✓ Exported to %s", path))
-		}
-		return m, nil
+		m.awaitingFormat = false
+		return m.runExport(export.FormatMD)
 
 	case "ctrl+e":
-		path, err := m.exportCurrentData(export.FormatHTML)
-		if err != nil {
-			m.Logs.AddEntry("ERROR", fmt.Sprintf("Export failed: %v", err))
-			m.setStatus(styles.ErrorStyle.Render("✗ Export failed"))
-		} else {
-			m.Logs.AddEntry("INFO", fmt.Sprintf("Exported to %s", path))
-			m.setStatus(fmt.Sprintf("✓ Exported to %s", path))
-		}
-		return m, nil
+		m.awaitingFormat = false
+		return m.runExport(export.FormatHTML)
 
 	case "?":
 		m.ShowHelp = true
@@ -229,6 +249,44 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	return m, nil
+}
+
+// handleFormatKey processes keys during export format selection.
+func (m *Model) handleFormatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "j":
+		m.awaitingFormat = false
+		return m.runExport(export.FormatJSON)
+	case "m":
+		m.awaitingFormat = false
+		return m.runExport(export.FormatMD)
+	case "h":
+		m.awaitingFormat = false
+		return m.runExport(export.FormatHTML)
+	case "c", "esc", "q", "enter":
+		m.awaitingFormat = false
+		m.setStatus(" Export cancelled")
+		return m, nil
+	}
+	// Ignore other keys during format selection
+	return m, nil
+}
+
+// runExport exports data and shows result in the status bar.
+func (m *Model) runExport(formatType export.Format) (tea.Model, tea.Cmd) {
+	path, err := m.exportCurrentData(formatType)
+	if err != nil {
+		m.Logs.AddEntry("ERROR", fmt.Sprintf("Export failed: %v", err))
+		m.setStatus(styles.ErrorStyle.Render("✗ Export failed"))
+	} else {
+		m.Logs.AddEntry("INFO", fmt.Sprintf("Exported to %s", path))
+		shortPath := path
+		if len(shortPath) > 40 {
+			shortPath = "..." + shortPath[len(shortPath)-37:]
+		}
+		m.setStatus(fmt.Sprintf("✓ Exported to %s", shortPath))
+	}
 	return m, nil
 }
 
@@ -402,11 +460,19 @@ func (m *Model) renderTabs() string {
 }
 
 func (m *Model) renderFooter() string {
+	if m.awaitingFormat {
+		prompt := " Export: (j)son  (m)d  (h)tml  (c)ancel"
+		footerWidth := m.Width - 2
+		if footerWidth < 20 {
+			footerWidth = 20
+		}
+		return styles.FooterStyle.Width(footerWidth).Render(prompt)
+	}
+
 	hints := []string{
 		"[↑/↓] Navigate",
 		"[←/→] Tabs",
 		"[TAB] Switch",
-		"[Enter] Select",
 		"[e] Export",
 		"[r] Refresh",
 		"[?] Help",

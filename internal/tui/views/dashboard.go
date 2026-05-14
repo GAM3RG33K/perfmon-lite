@@ -89,9 +89,18 @@ func renderCPUChart(snapshots []engine.TelemetrySnapshot, width int) string {
 	}
 
 	title := styles.SubHeaderStyle.Render("CPU Utilization (%)")
+	maxVal := computeMax(snapshots, func(s engine.TelemetrySnapshot) float64 { return s.CPUPercent })
+	if maxVal < 10 {
+		maxVal = 100 // default to 100% for low CPU scenarios
+	} else {
+		maxVal = maxVal * 1.2 // 20% headroom
+		// Round up to a nice number
+		maxVal = ceilNice(maxVal)
+	}
+
 	chart := renderSparkline(snapshots, width, func(s engine.TelemetrySnapshot) float64 {
 		return s.CPUPercent
-	}, 0, 100)
+	}, 0, maxVal)
 
 	var b strings.Builder
 	b.WriteString(title)
@@ -106,15 +115,62 @@ func renderMemoryChart(snapshots []engine.TelemetrySnapshot, width int) string {
 	}
 
 	title := styles.SubHeaderStyle.Render("Memory Footprint (MB)")
+	maxVal := computeMax(snapshots, func(s engine.TelemetrySnapshot) float64 {
+		return float64(s.MemoryKB) / 1024.0
+	})
+	if maxVal < 10 {
+		maxVal = 100
+	} else if maxVal > 0 {
+		maxVal = maxVal * 1.2
+		maxVal = ceilNice(maxVal)
+	}
+
 	chart := renderSparkline(snapshots, width, func(s engine.TelemetrySnapshot) float64 {
-		return float64(s.MemoryKB) / 1024.0 // Convert KB to MB
-	}, 0, 500)
+		return float64(s.MemoryKB) / 1024.0
+	}, 0, maxVal)
 
 	var b strings.Builder
 	b.WriteString(title)
 	b.WriteString("\n")
 	b.WriteString(chart)
 	return b.String()
+}
+
+// computeMax finds the maximum value in snapshots using the given value function.
+func computeMax(snapshots []engine.TelemetrySnapshot, fn func(engine.TelemetrySnapshot) float64) float64 {
+	var max float64
+	for _, s := range snapshots {
+		if v := fn(s); v > max {
+			max = v
+		}
+	}
+	return max
+}
+
+// ceilNice rounds a float64 up to a "nice" number for chart axis labels.
+// e.g. 34.7 → 40, 112 → 120, 567 → 600, 1234 → 2000
+func ceilNice(v float64) float64 {
+	if v < 1 {
+		return 1
+	}
+	// Determine magnitude
+	mag := 1.0
+	for v >= 10.0 {
+		v /= 10.0
+		mag *= 10.0
+	}
+	// Now v is in [1, 10), round up to 1, 2, 5, 10
+	switch {
+	case v <= 1:
+		v = 1
+	case v <= 2:
+		v = 2
+	case v <= 5:
+		v = 5
+	default:
+		v = 10
+	}
+	return v * mag
 }
 
 func renderSparkline(snapshots []engine.TelemetrySnapshot, width int, valueFn func(engine.TelemetrySnapshot) float64, minVal, maxVal float64) string {
