@@ -12,6 +12,9 @@ import (
 	"github.com/w1n/perfmon/internal/engine"
 )
 
+// shellReadTimeout is how long execInShell waits for a line of output before giving up.
+const shellReadTimeout = 10 * time.Second
+
 // shellEOFMaker is a unique string used to delimit command output
 // from the persistent ADB shell. Extremely unlikely to appear in real output.
 const shellEOFMaker = "__PERFMON_EOF__"
@@ -164,8 +167,21 @@ func (p *ADBProvider) execInShell(command string) (string, error) {
 
 	// Read output line by line until we see the EOF marker
 	var output strings.Builder
+	readCh := make(chan readResult, 1)
+	go p.readShellLine(readCh)
+
 	for {
-		line, err := p.shellOut.ReadString('\n')
+		var line string
+		var err error
+
+		select {
+		case res := <-readCh:
+			line, err = res.line, res.err
+		case <-time.After(shellReadTimeout):
+			p.shellOpen = false
+			return "", fmt.Errorf("shell read timed out after %v", shellReadTimeout)
+		}
+
 		if err != nil {
 			p.shellOpen = false // mark dead
 			return "", fmt.Errorf("shell read: %w", err)
@@ -176,9 +192,25 @@ func (p *ADBProvider) execInShell(command string) (string, error) {
 			break
 		}
 		output.WriteString(line)
+
+		// Start reading the next line
+		go p.readShellLine(readCh)
 	}
 
 	return output.String(), nil
+}
+
+// readResult holds a single line read from the shell and any error.
+type readResult struct {
+	line string
+	err  error
+}
+
+// readShellLine reads one line from the shell's buffered reader and sends it on ch.
+// Must be called in a goroutine since ReadString blocks.
+func (p *ADBProvider) readShellLine(ch chan<- readResult) {
+	line, err := p.shellOut.ReadString('\n')
+	ch <- readResult{line, err}
 }
 
 // closeShell kills the persistent ADB shell session, if any.

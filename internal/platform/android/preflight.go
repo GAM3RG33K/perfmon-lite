@@ -16,17 +16,20 @@ var DefaultAdbPaths = []string{
 
 // FindAdbPath searches for the adb binary in common locations.
 // It checks:
-//  1. The ADB_SYSTEM_PATH environment variable (for the full path to adb)
+//  1. The ADB_SYSTEM_PATH / PERFMON_ADB_PATH environment variable
 //  2. The PATH environment variable
 //  3. $ANDROID_HOME/platform-tools/adb
 //  4. $ANDROID_SDK_ROOT/platform-tools/adb
 //  5. ~/Library/Android/sdk/platform-tools/adb (macOS)
 //  6. ~/Android/Sdk/platform-tools/adb (Linux)
+//  7. %LOCALAPPDATA%/Android/Sdk/platform-tools/adb.exe (Windows)
 func FindAdbPath() (string, error) {
-	// Check explicit environment variable first
-	if envPath := os.Getenv("ADB_SYSTEM_PATH"); envPath != "" {
-		if _, err := os.Stat(envPath); err == nil {
-			return envPath, nil
+	// Check explicit environment variables first
+	for _, env := range []string{"PERFMON_ADB_PATH", "ADB_SYSTEM_PATH"} {
+		if envPath := os.Getenv(env); envPath != "" {
+			if _, err := os.Stat(envPath); err == nil {
+				return envPath, nil
+			}
 		}
 	}
 
@@ -35,7 +38,7 @@ func FindAdbPath() (string, error) {
 		return path, nil
 	}
 
-	// Check ANDROID_HOME
+	// Check ANDROID_HOME / SDK paths
 	searchDirs := []string{
 		os.Getenv("ANDROID_HOME"),
 		os.Getenv("ANDROID_SDK_ROOT"),
@@ -45,18 +48,22 @@ func FindAdbPath() (string, error) {
 	home, _ := os.UserHomeDir()
 	if home != "" {
 		searchDirs = append(searchDirs,
-			filepath.Join(home, "Library", "Android", "sdk"),
-			filepath.Join(home, "Android", "Sdk"),
+			filepath.Join(home, "Library", "Android", "sdk"),  // macOS
+			filepath.Join(home, "Android", "Sdk"),              // Linux
+			filepath.Join(home, "AppData", "Local", "Android", "Sdk"), // Windows
 		)
 	}
 
+	// Try adb (unix) and adb.exe (windows)
 	for _, dir := range searchDirs {
 		if dir == "" {
 			continue
 		}
-		adbPath := filepath.Join(dir, "platform-tools", "adb")
-		if _, err := os.Stat(adbPath); err == nil {
-			return adbPath, nil
+		for _, bin := range []string{"adb", "adb.exe"} {
+			adbPath := filepath.Join(dir, "platform-tools", bin)
+			if _, err := os.Stat(adbPath); err == nil {
+				return adbPath, nil
+			}
 		}
 	}
 

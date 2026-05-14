@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -19,16 +20,27 @@ import (
 	perfmonTui "github.com/w1n/perfmon/internal/tui"
 )
 
+// Exit codes (see docs/cli-reference.md §6)
+const (
+	exitSuccess       = 0
+	exitGeneralError  = 1
+	exitDeviceError   = 2
+	exitToolError     = 3
+	exitExportError   = 4
+)
+
 var version = "1.0.0"
 
 func main() {
-	// CLI flags
+	// ── CLI flags ───────────────────────────────────────────────────────
 	mockMode := flag.Bool("mock", false, "Run with simulated telemetry data (no device required)")
 	iOSMode := flag.Bool("ios", false, "Force iOS mode (use xcrun instead of ADB)")
-	intervalFlag := flag.Int("interval", 1, "Polling interval in seconds (range: 1-60)")
-	bufferFlag := flag.Int("buffer", 300, "Ring buffer capacity (number of data points)")
+	targetFlag := flag.String("target", "", "Specify target device (e.g., emulator-5554)")
+	flag.StringVar(targetFlag, "t", "", "Shorthand for --target")
+	intervalFlag := flag.Int("interval", envInt("PERFMON_POLL_INTERVAL", 1), "Polling interval in seconds (range: 1-60)")
+	bufferFlag := flag.Int("buffer", envInt("PERFMON_BUFFER_SIZE", 300), "Ring buffer capacity (number of data points)")
 	exportFlag := flag.String("export", "", "Export format: json, md, html, pdf")
-	outputFlag := flag.String("output", "./perfmon_export", "Output path for export file (without extension)")
+	outputFlag := flag.String("output", envStr("PERFMON_EXPORT_DIR", "./perfmon_export"), "Output path for export file (without extension)")
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging")
 	showVersion := flag.Bool("version", false, "Show version information")
 	showHelp := flag.Bool("help", false, "Show help message")
@@ -50,13 +62,13 @@ func main() {
 	// Handle version flag
 	if *showVersion {
 		fmt.Printf("perfmon v%s\n", version)
-		os.Exit(0)
+		os.Exit(exitSuccess)
 	}
 
 	// Handle help flag
 	if *showHelp {
 		flag.Usage()
-		os.Exit(0)
+		os.Exit(exitSuccess)
 	}
 
 	// Validate interval
@@ -83,6 +95,10 @@ func main() {
 	var initialPID int32
 	var targetPlatform engine.Platform
 
+	// ══════════════════════════════════════════════════════════════════════
+	// Provider Setup
+	// ══════════════════════════════════════════════════════════════════════
+
 	if *mockMode {
 		// ── Mock mode ────────────────────────────────────────────────────
 		mockProvider := mock.NewProvider(time.Now().UnixNano())
@@ -98,11 +114,22 @@ func main() {
 		}
 	} else if *iOSMode {
 		// ── iOS mode (forced via --ios flag) ────────────────────────────
-		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform = setupiOSProvider(*verboseFlag)
+		var iosErr error
+		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, iosErr = tryiOSProvider(*verboseFlag)
+		if iosErr != nil {
+			fmt.Fprintf(os.Stderr, "iOS Error: %v\n", iosErr)
+			fmt.Fprintf(os.Stderr, "Use --mock for development:  perfmon --mock\n")
+			os.Exit(exitToolError)
+		}
 	} else {
 		// ── Auto-detect: try Android first ────────────────────────────
-		adbPath, adbErr := android.FindAdbPath()
-		if adbErr != nil {
+		var androidErr error
+		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, androidErr = tryAndroidProvider("", *verboseFlag)
+		if androidErr != nil {
+			if *verboseFlag {
+				log.Printf("Android not available: %v", androidErr)
+			}
+
 			wizardResult := runPreflightWizard()
 			switch wizardResult {
 			case "mock":
@@ -113,9 +140,14 @@ func main() {
 				discoveredDevices = []engine.Device{mock.MockDevice()}
 				discoveredProcesses = []engine.AppProcess{mock.MockProcess()}
 			case "retry":
-		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, _ = tryAndroidProvider(adbPath, *verboseFlag)
-		case "quit":
-				os.Exit(0)
+				provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, androidErr = tryAndroidProvider("", *verboseFlag)
+				if androidErr != nil {
+					fmt.Fprintf(os.Stderr, "Android still unavailable: %v\n", androidErr)
+					fmt.Fprintf(os.Stderr, "Use --mock for development:  perfmon --mock\n")
+					os.Exit(exitToolError)
+				}
+			case "quit":
+				os.Exit(exitSuccess)
 			default:
 				// Fall through to iOS
 			}
@@ -123,13 +155,23 @@ func main() {
 			// If wizard didn't set up a provider, try iOS
 			if provider == nil {
 				if *verboseFlag {
-					log.Printf("Android not available — trying iOS...")
+					log.Printf("Trying iOS fallback...")
 				}
-				provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform = setupiOSProvider(*verboseFlag)
+				var iosErr error
+				provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, iosErr = tryiOSProvider(*verboseFlag)
+				if iosErr != nil {
+					fmt.Fprintf(os.Stderr, "iOS also unavailable: %v\n", iosErr)
+					fmt.Fprintf(os.Stderr, "Use --mock for development:  perfmon --mock\n")
+					os.Exit(exitToolError)
+				}
 			}
-		} else {
-			provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, _ = tryAndroidProvider(adbPath, *verboseFlag)
 		}
+	}
+
+	if provider == nil {
+		fmt.Fprintf(os.Stderr, "No platform provider could be configured.\n")
+		fmt.Fprintf(os.Stderr, "Use --mock for development:  perfmon --mock\n")
+		os.Exit(exitToolError)
 	}
 
 	// ══════════════════════════════════════════════════════════════════════
@@ -158,7 +200,7 @@ func main() {
 		snapshots := eng.Buffer.GetAll()
 		if len(snapshots) == 0 {
 			fmt.Println("No telemetry data collected — exiting.")
-			os.Exit(1)
+			os.Exit(exitGeneralError)
 		}
 
 		deviceName := "unknown"
@@ -184,7 +226,7 @@ func main() {
 			format = export.FormatPDF
 		default:
 			fmt.Fprintf(os.Stderr, "Unsupported export format: %s (supported: json, md, html, pdf)\n", *exportFlag)
-			os.Exit(1)
+			os.Exit(exitGeneralError)
 		}
 
 		opts := export.Options{
@@ -199,18 +241,18 @@ func main() {
 
 		if err := export.EnsureOutputDir(opts.OutputPath); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to create output directory: %v\n", err)
-			os.Exit(1)
+			os.Exit(exitExportError)
 		}
 
 		fmt.Printf("Exporting %d data points to %s format...\n", len(snapshots), *exportFlag)
 		path, err := export.Export(snapshots, opts)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Export failed: %v\n", err)
-			os.Exit(1)
+			os.Exit(exitExportError)
 		}
 
 		fmt.Printf("Report written to: %s\n", path)
-		os.Exit(0)
+		os.Exit(exitSuccess)
 	}
 
 	// ══════════════════════════════════════════════════════════════════════
@@ -260,10 +302,17 @@ func hintInstallXcode() string {
 }
 
 // tryAndroidProvider attempts to set up the Android provider.
-// adbPath should be resolved via android.FindAdbPath() first.
+// If adbPath is empty, it auto-discovers the adb binary.
 func tryAndroidProvider(adbPath string, verbose bool) (engine.TelemetryProvider, []engine.Device, []engine.AppProcess, int32, engine.Platform, error) {
+	if adbPath == "" {
+		var err error
+		adbPath, err = android.FindAdbPath()
+		if err != nil {
+			return nil, nil, nil, 0, "", err
+		}
+	}
+
 	if verbose {
-		log.Print("Looking for ADB...")
 		log.Printf("ADB found at: %s", adbPath)
 	}
 
@@ -357,17 +406,16 @@ func tryAndroidProvider(adbPath string, verbose bool) (engine.TelemetryProvider,
 	return androidProvider, devices, processes, initialPID, engine.PlatformAndroid, nil
 }
 
-// setupiOSProvider creates and configures the iOS provider.
-func setupiOSProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, []engine.AppProcess, int32, engine.Platform) {
+// tryiOSProvider attempts to set up the iOS provider.
+// Returns an error if xcrun is unavailable or no devices/processes are found.
+func tryiOSProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, []engine.AppProcess, int32, engine.Platform, error) {
 	if verbose {
 		log.Print("Looking for xcrun...")
 	}
 
 	xcrunPath, err := iosPkg.FindXcrunPath()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "iOS Error: %v\n", err)
-		fmt.Fprint(os.Stderr, hintInstallXcode())
-		os.Exit(1)
+		return nil, nil, nil, 0, "", fmt.Errorf("xcrun not found: %w", err)
 	}
 
 	if verbose {
@@ -377,7 +425,7 @@ func setupiOSProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, 
 	// Verify xcrun version
 	xcrunVer, err := iosPkg.CheckVersion(xcrunPath)
 	if err != nil {
-		log.Fatalf("xcrun version check failed: %v", err)
+		return nil, nil, nil, 0, "", fmt.Errorf("xcrun version check failed: %w", err)
 	}
 	if verbose {
 		log.Printf("xcrun version: %s", xcrunVer.String())
@@ -385,7 +433,7 @@ func setupiOSProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, 
 
 	// Check xcode-select
 	if err := iosPkg.CheckXcodeSelect(); err != nil {
-		log.Fatalf("Xcode not configured: %v", err)
+		return nil, nil, nil, 0, "", fmt.Errorf("Xcode not configured: %w", err)
 	}
 
 	// Create the iOS provider
@@ -394,10 +442,10 @@ func setupiOSProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, 
 	// Discover iOS devices and simulators
 	devices, err := iOSProvider.Discover()
 	if err != nil {
-		log.Fatalf("Failed to discover iOS devices: %v", err)
+		return nil, nil, nil, 0, "", fmt.Errorf("failed to discover iOS devices: %w", err)
 	}
 	if len(devices) == 0 {
-		log.Fatalf("No iOS devices or simulators found. Boot a simulator, connect a device, or use --mock for development.")
+		return nil, nil, nil, 0, "", errors.New("no iOS devices or simulators found")
 	}
 
 	if verbose {
@@ -425,10 +473,10 @@ func setupiOSProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, 
 	// Discover processes
 	processes, err := iOSProvider.MapProcesses(selectedDevice.ID)
 	if err != nil {
-		log.Fatalf("Failed to list processes on %s: %v", selectedDevice.ID, err)
+		return nil, nil, nil, 0, "", fmt.Errorf("failed to list processes on %s: %w", selectedDevice.ID, err)
 	}
 	if len(processes) == 0 {
-		log.Fatalf("No processes found on device %s", selectedDevice.ID)
+		return nil, nil, nil, 0, "", fmt.Errorf("no processes found on device %s", selectedDevice.ID)
 	}
 
 	if verbose {
@@ -461,7 +509,7 @@ func setupiOSProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, 
 		}
 	}
 
-	return iOSProvider, devices, processes, initialPID, engine.PlatformIOS
+	return iOSProvider, devices, processes, initialPID, engine.PlatformIOS, nil
 }
 
 // selectBestProcess picks the most interesting process from a list of processes.
@@ -568,75 +616,21 @@ func isCommandAvailable(name string) bool {
 	return err == nil
 }
 
-// hintInstallADB returns a help string for installing ADB.
-func hintInstallADB() string {
-	return `
-  ── ADB Installation Help ──────────────────────────────
-    macOS (Homebrew):    brew install android-platform-tools
-    macOS (Manual):      brew install --cask android-sdk
-    Linux:               sudo apt install adb
-                         sudo pacman -S android-tools
-    Verify:              adb devices -l
-  ────────────────────────────────────────────────────────
-  Or run with --mock for development:  perfmon --mock
-`
-}
-
-// listDevices lists connected devices.
-func listDevices(useMock bool) {
-	if useMock {
-		fmt.Println("Available Devices:")
-		fmt.Println("──────────────────────────────")
-		dev := mock.MockDevice()
-		fmt.Printf("  %s (%s) — %s\n", dev.Name, dev.ID, dev.Platform)
-		fmt.Println()
-		fmt.Println("Processes:")
-		fmt.Println("──────────────────────────────")
-		proc := mock.MockProcess()
-		fmt.Printf("  PID %d — %s [%s]\n", proc.PID, proc.PackageName, proc.BuildType)
-		return
-	}
-
-	adbPath, err := android.FindAdbPath()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ADB not found: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Use --mock for simulated output.\n")
-		return
-	}
-
-	provider := android.NewProvider(adbPath)
-	devices, err := provider.Discover()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to discover devices: %v\n", err)
-		return
-	}
-
-	if len(devices) == 0 {
-		fmt.Println("No Android devices found.")
-		fmt.Println("Connect a device or use --mock for simulated output.")
-		return
-	}
-
-	fmt.Println("Available Devices:")
-	fmt.Println("──────────────────────────────")
-	for _, d := range devices {
-		typ := "emulator"
-		if d.IsPhysical {
-			typ = "physical"
+// envInt reads an integer from an environment variable, falling back to defaultVal.
+func envInt(key string, defaultVal int) int {
+	if v := os.Getenv(key); v != "" {
+		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil {
+			return n
 		}
-		fmt.Printf("  %s (%s) — %s, %s\n", d.Name, d.ID, d.Platform, typ)
 	}
+	return defaultVal
 }
 
-// exportData exports telemetry data (stub for now).
-func exportData(eng *engine.Engine, args []string, output string) {
-	format := "json"
-	if len(args) > 1 {
-		format = args[1]
+// envStr reads a string from an environment variable, falling back to defaultVal.
+func envStr(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
-
-	snapshots := eng.Buffer.GetAll()
-	fmt.Printf("Exporting %d telemetry data points in %s format...\n", len(snapshots), format)
-	fmt.Println("Full export subsystem coming in Phase 4.")
-	fmt.Printf("Output would be written to: %s.%s\n", output, format)
+	return defaultVal
 }
