@@ -19,7 +19,7 @@ import (
 	perfmonTui "github.com/w1n/perfmon/internal/tui"
 )
 
-const version = "1.0.0"
+var version = "1.0.0"
 
 func main() {
 	// CLI flags

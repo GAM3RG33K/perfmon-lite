@@ -6,7 +6,7 @@ COVERAGE_FILE := coverage.out
 DIST_DIR := dist
 
 # Auto-detect version from source; override with: make release VERSION=1.1.0
-VERSION ?= $(shell grep 'const version' cmd/perfmon/main.go | sed 's/.*"\(.*\)".*/\1/')
+VERSION ?= $(shell grep -E '\bversion\s*=' cmd/perfmon/main.go | sed 's/.*"\(.*\)".*/\1/')
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
