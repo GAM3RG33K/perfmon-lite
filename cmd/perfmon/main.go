@@ -35,12 +35,11 @@ var version = "1.0.0"
 func main() {
 	// ── CLI flags ───────────────────────────────────────────────────────
 	mockMode := flag.Bool("mock", false, "Run with simulated telemetry data (no device required)")
-	iOSMode := flag.Bool("ios", false, "Force iOS mode (use xcrun instead of ADB)")
-	targetFlag := flag.String("target", "", "Specify target device (e.g., emulator-5554)")
-	flag.StringVar(targetFlag, "t", "", "Shorthand for --target")
+	deviceFlag := flag.String("device", "", "Specify target device (serial/UUID) or package name")
+	flag.StringVar(deviceFlag, "d", "", "Shorthand for --device")
 	intervalFlag := flag.Int("interval", envInt("PERFMON_POLL_INTERVAL", 1), "Polling interval in seconds (range: 1-60)")
 	bufferFlag := flag.Int("buffer", envInt("PERFMON_BUFFER_SIZE", 300), "Ring buffer capacity (number of data points)")
-	exportFlag := flag.String("export", "", "Export format: json, md, html, pdf")
+	exportFlag := flag.String("export", "", "Export format: json, md, html")
 	outputFlag := flag.String("output", envStr("PERFMON_EXPORT_DIR", "./perfmon_export"), "Output path for export file (without extension)")
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging")
 	showVersion := flag.Bool("version", false, "Show version information")
@@ -52,8 +51,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage:\n")
 		fmt.Fprintf(os.Stderr, "  perfmon [flags]\n")
 		fmt.Fprintf(os.Stderr, "  perfmon devices [flags]\n")
-		fmt.Fprintf(os.Stderr, "  perfmon export <format> [flags]\n")
-		fmt.Fprintf(os.Stderr, "  perfmon version [flags]\n")
 		fmt.Fprintf(os.Stderr, "\nFlags:\n")
 		flag.PrintDefaults()
 	}
@@ -62,22 +59,9 @@ func main() {
 
 	// Handle subcommands
 	args := flag.Args()
-	if len(args) > 0 {
-		switch args[0] {
-		case "devices":
-			runDevices(args[1:], *verboseFlag)
-			os.Exit(exitSuccess)
-		case "export":
-			if len(args) < 2 {
-				fmt.Fprintf(os.Stderr, "Usage: perfmon export <format> [--output <path>]\n")
-				os.Exit(exitGeneralError)
-			}
-			fmt.Fprintf(os.Stderr, "Use --export flag instead: perfmon --mock --export %s\n", args[1])
-			os.Exit(exitGeneralError)
-		case "version":
-			fmt.Printf("perfmon v%s\n", version)
-			os.Exit(exitSuccess)
-		}
+	if len(args) > 0 && args[0] == "devices" {
+		runDevices(args[1:], *verboseFlag)
+		os.Exit(exitSuccess)
 	}
 
 	// Handle version flag
@@ -92,20 +76,6 @@ func main() {
 		os.Exit(exitSuccess)
 	}
 
-	// Validate interval
-	if *intervalFlag < 1 || *intervalFlag > 60 {
-		log.Fatalf("--interval must be between 1 and 60 seconds, got %d", *intervalFlag)
-	}
-
-	// Validate buffer
-	if *bufferFlag < 10 {
-		log.Fatalf("--buffer must be at least 10, got %d", *bufferFlag)
-	}
-
-	if *verboseFlag {
-		log.SetFlags(log.Ltime | log.Lmicroseconds)
-	}
-
 	// ══════════════════════════════════════════════════════════════════════
 	// Provider Setup
 	// ══════════════════════════════════════════════════════════════════════
@@ -115,10 +85,6 @@ func main() {
 	var discoveredProcesses []engine.AppProcess
 	var initialPID int32
 	var targetPlatform engine.Platform
-
-	// ══════════════════════════════════════════════════════════════════════
-	// Provider Setup
-	// ══════════════════════════════════════════════════════════════════════
 
 	if *mockMode {
 		// ── Mock mode ────────────────────────────────────────────────────
@@ -133,60 +99,9 @@ func main() {
 			log.Printf("Starting perfmon v%s (mock mode: interval=%ds, buffer=%d)\n",
 				version, *intervalFlag, *bufferFlag)
 		}
-	} else if *iOSMode {
-		// ── iOS mode (forced via --ios flag) ────────────────────────────
-		var iosErr error
-		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, iosErr = tryiOSProvider(*verboseFlag)
-		if iosErr != nil {
-			fmt.Fprintf(os.Stderr, "iOS Error: %v\n", iosErr)
-			fmt.Fprintf(os.Stderr, "Use --mock for development:  perfmon --mock\n")
-			os.Exit(exitToolError)
-		}
 	} else {
-		// ── Auto-detect: try Android first ────────────────────────────
-		var androidErr error
-		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, androidErr = tryAndroidProvider("", *verboseFlag)
-		if androidErr != nil {
-			if *verboseFlag {
-				log.Printf("Android not available: %v", androidErr)
-			}
-
-			wizardResult := runPreflightWizard()
-			switch wizardResult {
-			case "mock":
-				mockProvider := mock.NewProvider(time.Now().UnixNano())
-				provider = mockProvider
-				initialPID = 9001
-				targetPlatform = engine.PlatformMock
-				discoveredDevices = []engine.Device{mock.MockDevice()}
-				discoveredProcesses = []engine.AppProcess{mock.MockProcess()}
-			case "retry":
-				provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, androidErr = tryAndroidProvider("", *verboseFlag)
-				if androidErr != nil {
-					fmt.Fprintf(os.Stderr, "Android still unavailable: %v\n", androidErr)
-					fmt.Fprintf(os.Stderr, "Use --mock for development:  perfmon --mock\n")
-					os.Exit(exitToolError)
-				}
-			case "quit":
-				os.Exit(exitSuccess)
-			default:
-				// Fall through to iOS
-			}
-
-			// If wizard didn't set up a provider, try iOS
-			if provider == nil {
-				if *verboseFlag {
-					log.Printf("Trying iOS fallback...")
-				}
-				var iosErr error
-				provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, iosErr = tryiOSProvider(*verboseFlag)
-				if iosErr != nil {
-					fmt.Fprintf(os.Stderr, "iOS also unavailable: %v\n", iosErr)
-					fmt.Fprintf(os.Stderr, "Use --mock for development:  perfmon --mock\n")
-					os.Exit(exitToolError)
-				}
-			}
-		}
+		// ── Auto-detect: discover all platforms ───────────────────────
+		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform = autoDetectProvider(*deviceFlag, *verboseFlag)
 	}
 
 	if provider == nil {
@@ -243,10 +158,8 @@ func main() {
 			format = export.FormatMD
 		case "html":
 			format = export.FormatHTML
-		case "pdf":
-			format = export.FormatPDF
 		default:
-			fmt.Fprintf(os.Stderr, "Unsupported export format: %s (supported: json, md, html, pdf)\n", *exportFlag)
+			fmt.Fprintf(os.Stderr, "Unsupported export format: %s (supported: json, md, html)\n", *exportFlag)
 			os.Exit(exitGeneralError)
 		}
 
@@ -431,6 +344,91 @@ func tryAndroidProvider(adbPath string, verbose bool) (engine.TelemetryProvider,
 	}
 
 	return androidProvider, devices, processes, initialPID, engine.PlatformAndroid, nil
+}
+
+// autoDetectProvider discovers the best available platform (Android → iOS → mock).
+// If a deviceID is provided, it selects that specific device.
+func autoDetectProvider(deviceID string, verbose bool) (
+	provider engine.TelemetryProvider,
+	devices []engine.Device,
+	processes []engine.AppProcess,
+	pid int32,
+	platform engine.Platform,
+) {
+	// Try Android first
+	var androidErr error
+	if aProv, aDevs, aProcs, aPID, aPlat, aErr := tryAndroidProvider("", verbose); aErr == nil {
+		androidErr = nil
+		if deviceID == "" || matchDevice(aDevs, deviceID) {
+			provider, devices, processes, pid, platform = aProv, aDevs, aProcs, aPID, aPlat
+			return
+		}
+	} else {
+		androidErr = aErr
+	}
+
+	// Try iOS
+	if iProv, iDevs, iProcs, iPID, iPlat, iErr := tryiOSProvider(verbose); iErr == nil {
+		if deviceID == "" || matchDevice(iDevs, deviceID) {
+			provider, devices, processes, pid, platform = iProv, iDevs, iProcs, iPID, iPlat
+			return
+		}
+	} else if androidErr != nil && verbose {
+		log.Printf("iOS also unavailable: %v", iErr)
+	}
+
+	// Device was specified but not found on any platform
+	if deviceID != "" {
+		fmt.Fprintf(os.Stderr, "Device %q not found on any platform.\n", deviceID)
+		fmt.Fprintf(os.Stderr, "Use --mock for development:  perfmon --mock\n")
+		os.Exit(exitDeviceError)
+	}
+
+	// Run the pre-flight wizard
+	if verbose && androidErr != nil {
+		log.Printf("Android not available: %v", androidErr)
+	}
+
+	wizardResult := runPreflightWizard()
+	switch wizardResult {
+	case "mock":
+		mockProv := mock.NewProvider(time.Now().UnixNano())
+		provider, pid, platform = mockProv, 9001, engine.PlatformMock
+		devices = []engine.Device{mock.MockDevice()}
+		processes = []engine.AppProcess{mock.MockProcess()}
+		return
+	case "retry":
+		if aProv, aDevs, aProcs, aPID, aPlat, aErr := tryAndroidProvider("", verbose); aErr == nil {
+			provider, devices, processes, pid, platform = aProv, aDevs, aProcs, aPID, aPlat
+			return
+		} else if verbose {
+			log.Printf("Android still unavailable: %v", aErr)
+		}
+		// iOS fallback
+		if iProv, iDevs, iProcs, iPID, iPlat, iErr := tryiOSProvider(verbose); iErr == nil {
+			provider, devices, processes, pid, platform = iProv, iDevs, iProcs, iPID, iPlat
+			return
+		} else if verbose {
+			log.Printf("iOS also unavailable: %v", iErr)
+		}
+	case "quit":
+		os.Exit(exitSuccess)
+	}
+
+	fmt.Fprintf(os.Stderr, "No platform provider could be configured.\n")
+	fmt.Fprintf(os.Stderr, "Use --mock for development:  perfmon --mock\n")
+	os.Exit(exitToolError)
+	return
+}
+
+// matchDevice checks if any device in the list matches the given ID or name.
+func matchDevice(devices []engine.Device, id string) bool {
+	for _, d := range devices {
+		if d.ID == id || d.Name == id {
+			return true
+		}
+	}
+	return false
 }
 
 // tryiOSProvider attempts to set up the iOS provider.
