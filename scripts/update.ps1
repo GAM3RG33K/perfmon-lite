@@ -63,7 +63,10 @@ Write-Host "  New version available: ${Latest} (current: v${Current})"
 # ── Detect platform ────────────────────────────────────────────────────
 $Arch = $env:PROCESSOR_ARCHITECTURE
 if ($Arch -eq "AMD64") { $GoArch = "amd64" }
-elseif ($Arch -eq "ARM64") { $GoArch = "arm64" }
+elseif ($Arch -eq "ARM64") {
+  Write-Host "  Windows on ARM — using x64 binary (via emulation)"
+  $GoArch = "amd64"
+}
 else {
   Write-Host "ERROR: unsupported architecture: $Arch"
   exit 1

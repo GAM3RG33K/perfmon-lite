@@ -20,7 +20,6 @@ cross-build: ## Build binaries for all platforms (linux/darwin/windows x amd64/a
 	@echo "=== Cross-platform build ==="
 	@for goos in linux darwin windows; do \
 	  for goarch in amd64 arm64; do \
-	    if [ "$$goos" = "windows" ] && [ "$$goarch" = "arm64" ]; then continue; fi; \
 	    ext=""; \
 	    if [ "$$goos" = "windows" ]; then ext=".exe"; fi; \
 	    out="$(DIST_DIR)/$(APP_NAME)-$$goos-$$goarch$$ext"; \
