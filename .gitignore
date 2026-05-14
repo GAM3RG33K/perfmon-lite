@@ -35,3 +35,7 @@ vendor/
 dist/
 build/
 release/
+
+# Local debugging artifacts
+.local/
+coverage.out

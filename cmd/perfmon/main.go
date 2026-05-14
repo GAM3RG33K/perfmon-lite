@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -99,15 +100,35 @@ func main() {
 		// ── iOS mode (forced via --ios flag) ────────────────────────────
 		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform = setupiOSProvider(*verboseFlag)
 	} else {
-		// ── Auto-detect: try Android first, then iOS on macOS ──────────
-		var androidErr error
-		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, androidErr = tryAndroidProvider(*verboseFlag)
-
-		if androidErr != nil {
-			if *verboseFlag {
-				log.Printf("Android not available: %v — trying iOS...", androidErr)
+		// ── Auto-detect: try Android first ────────────────────────────
+		adbPath, adbErr := android.FindAdbPath()
+		if adbErr != nil {
+			wizardResult := runPreflightWizard()
+			switch wizardResult {
+			case "mock":
+				mockProvider := mock.NewProvider(time.Now().UnixNano())
+				provider = mockProvider
+				initialPID = 9001
+				targetPlatform = engine.PlatformMock
+				discoveredDevices = []engine.Device{mock.MockDevice()}
+				discoveredProcesses = []engine.AppProcess{mock.MockProcess()}
+			case "retry":
+		provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, _ = tryAndroidProvider(adbPath, *verboseFlag)
+		case "quit":
+				os.Exit(0)
+			default:
+				// Fall through to iOS
 			}
-			provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform = setupiOSProvider(*verboseFlag)
+
+			// If wizard didn't set up a provider, try iOS
+			if provider == nil {
+				if *verboseFlag {
+					log.Printf("Android not available — trying iOS...")
+				}
+				provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform = setupiOSProvider(*verboseFlag)
+			}
+		} else {
+			provider, discoveredDevices, discoveredProcesses, initialPID, targetPlatform, _ = tryAndroidProvider(adbPath, *verboseFlag)
 		}
 	}
 
@@ -239,18 +260,10 @@ func hintInstallXcode() string {
 }
 
 // tryAndroidProvider attempts to set up the Android provider.
-// Returns an error if ADB is not available or no Android devices are found.
-func tryAndroidProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, []engine.AppProcess, int32, engine.Platform, error) {
+// adbPath should be resolved via android.FindAdbPath() first.
+func tryAndroidProvider(adbPath string, verbose bool) (engine.TelemetryProvider, []engine.Device, []engine.AppProcess, int32, engine.Platform, error) {
 	if verbose {
 		log.Print("Looking for ADB...")
-	}
-
-	adbPath, err := android.FindAdbPath()
-	if err != nil {
-		return nil, nil, nil, 0, "", fmt.Errorf("ADB not found: %w", err)
-	}
-
-	if verbose {
 		log.Printf("ADB found at: %s", adbPath)
 	}
 
@@ -477,6 +490,82 @@ func selectBestProcess(processes []engine.AppProcess) engine.AppProcess {
 
 	// Should never get here, but return empty
 	return engine.AppProcess{}
+}
+
+// runPreflightWizard displays an interactive setup wizard when ADB is not found.
+// Returns the user's choice: "mock", "retry", "quit", or "" (fall through to iOS).
+func runPreflightWizard() string {
+	fmt.Print("\n")
+	fmt.Println("╔══════════════════════════════════════════════════════════╗")
+	fmt.Println("║           perfmon — Pre-flight Setup Wizard             ║")
+	fmt.Println("╠══════════════════════════════════════════════════════════╣")
+	fmt.Println("║  ADB (Android Debug Bridge) was not found.              ║")
+	fmt.Println("║  ADB is required to profile Android devices.            ║")
+	fmt.Println("║                                                        ║")
+	fmt.Println("║  Common install methods:                               ║")
+	if isCommandAvailable("brew") {
+		fmt.Println("║    brew install android-platform-tools                  ║")
+	}
+	if isCommandAvailable("apt-get") {
+		fmt.Println("║    sudo apt install adb                                 ║")
+	}
+	fmt.Println("║    https://developer.android.com/studio/releases/       ║")
+	fmt.Println("║              platform-tools                              ║")
+	fmt.Println("╚══════════════════════════════════════════════════════════╝")
+	fmt.Println()
+
+	for {
+		fmt.Println("What would you like to do?")
+		if isCommandAvailable("brew") {
+			fmt.Println("  1) Install ADB via Homebrew (recommended)")
+		}
+		fmt.Println("  2) I've installed ADB — retry detection")
+		fmt.Println("  3) Skip — use mock mode (no device needed)")
+		fmt.Println("  4) Skip — try iOS mode (macOS only)")
+		fmt.Println("  5) Quit")
+		fmt.Print("Choice [1-5]: ")
+
+		var choice string
+		fmt.Scanln(&choice)
+
+		switch choice {
+		case "1":
+			if isCommandAvailable("brew") {
+				fmt.Println("\nInstalling ADB via Homebrew...")
+				cmd := exec.Command("brew", "install", "android-platform-tools")
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					fmt.Fprintf(os.Stderr, "Installation failed: %v\n\n", err)
+					continue
+				}
+				fmt.Println("\n✓ ADB installed successfully! Retrying...")
+				return "retry"
+			}
+			fmt.Println("Homebrew not available on this system.")
+			continue
+		case "2":
+			fmt.Println("\nRetrying ADB detection...")
+			return "retry"
+		case "3":
+			fmt.Println("\nStarting in mock mode...")
+			return "mock"
+		case "4":
+			fmt.Println("\nSkipping to iOS mode...")
+			return ""
+		case "5":
+			fmt.Println("Goodbye.")
+			return "quit"
+		default:
+			fmt.Println("Invalid choice — please enter a number 1-5.")
+		}
+	}
+}
+
+// isCommandAvailable checks if a command exists in PATH.
+func isCommandAvailable(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
 }
 
 // hintInstallADB returns a help string for installing ADB.

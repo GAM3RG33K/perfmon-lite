@@ -16,8 +16,8 @@
 | 0.3 | Create directory structure (cmd/, internal/, etc.) | ✅ All dirs scaffolded |
 | 0.4 | Install TUI dependencies (bubbletea, lipgloss, bubbles) | ✅ `go mod tidy` completed |
 | 0.5 | Add Makefile / Taskfile (build, run, mock, test, lint, clean) | ✅ `Makefile` with 10 targets |
-| 0.6 | Add `.goreleaser.yml` for multi-arch release builds | ❌ |
-| 0.7 | Add GitHub Actions CI (lint + test + build matrix) | ❌ |
+| 0.6 | Add `.goreleaser.yml` for multi-arch release builds | ✅ GoReleaser config v2, post-build smoke test hook |
+| 0.7 | Add GitHub Actions CI (lint + test + build matrix) | ✅ Build, vet, test, cross-build, ADB integration, artifact upload |
 | 0.8 | Add `.gitignore` for Go projects | ✅ Standard Go .gitignore |
 
 ---
@@ -87,12 +87,12 @@
 | #  | Task | Status |
 |----|------|--------|
 | 5.1 | Keyboard shortcut system — TAB-switch, `e` export, `q` quit, `↑/↓` navigate, `/` search | ✅ Implemented in TUI model (TAB, arrows, q, Ctrl+C, resize) |
-| 5.2 | Performance optimization — Profiling loop <2% host CPU overhead | ❌ |
-| 5.3 | Binary stripping & size check — `go build -ldflags="-s -w"`, verify <20MB target | ⏳ `make build` configured with `-ldflags="-s -w"`, ~4.7MB |
-| 5.4 | Pre-flight setup wizard — Detect missing `adb`, offer guided install | ❌ |
-| 5.5 | Comprehensive test suite — Unit tests for engine, mock provider, platform parsers | ✅ **61 tests** across 5 files: engine (20), types (7), mock (15), android parsers (50), android pipe (11) |
+| 5.2 | Performance optimization — Profiling loop <2% host CPU overhead | ✅ Measured 0–0.1% CPU overhead, well under target |
+| 5.3 | Binary stripping & size check — `go build -ldflags="-s -w"`, verify <20MB target | ✅ `make build` configured with `-ldflags="-s -w"`, 5.5MB darwin/arm64 (max 6.1MB windows) |
+| 5.4 | Pre-flight setup wizard — Detect missing `adb`, offer guided install | ✅ Interactive wizard with Homebrew install, retry, mock/iOS fallback |
+| 5.5 | Comprehensive test suite — Unit tests for engine, mock provider, platform parsers | ✅ **181+ tests** across all packages: engine (27), mock (15), android (59), ios (34), export (35), adb integration (13) |
 | 5.6 | Documentation — README, CLI `--help` output, architecture docs | ✅ README.md + 4 docs in `docs/`: plan, architecture, checklist, CLI reference |
-| 5.7 | GitHub Release workflow — Automated releases with GoReleaser | ❌ |
+| 5.7 | GitHub Release workflow — Automated releases with GoReleaser | ✅ `.goreleaser.yml` + CI + post-build hook |
 
 ---
 

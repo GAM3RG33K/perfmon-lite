@@ -1,0 +1,99 @@
+# GoReleaser configuration for perfmon
+# https://goreleaser.com
+version: 2
+project_name: perfmon
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: perfmon
+    main: ./cmd/perfmon/
+    binary: perfmon
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    hooks:
+      post:
+        - cmd: "./.goreleaser/post-build.sh {{ .Path }} {{ .Name }}"
+          output: true
+
+archives:
+  - id: binary
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: ["binary"]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+signs: []
+
+release:
+  github:
+    owner: GAM3RG33K
+    name: perfmon-lite
+  header: |
+    ## perfmon {{ .Version }}
+
+    Performance Monitor & Profiler — CPU, memory, and thread telemetry for mobile apps.
+
+    ### Installation
+    ```bash
+    # macOS (Apple Silicon)
+    curl -LO https://github.com/GAM3RG33K/perfmon-lite/releases/download/{{ .Tag }}/perfmon_{{ .Version }}_darwin_arm64
+    chmod +x perfmon_{{ .Version }}_darwin_arm64
+    sudo mv perfmon_{{ .Version }}_darwin_arm64 /usr/local/bin/perfmon
+
+    # Linux (x86_64)
+    curl -LO https://github.com/GAM3RG33K/perfmon-lite/releases/download/{{ .Tag }}/perfmon_{{ .Version }}_linux_amd64
+    chmod +x perfmon_{{ .Version }}_linux_amd64
+    sudo mv perfmon_{{ .Version }}_linux_amd64 /usr/local/bin/perfmon
+    ```
+  footer: |
+    ### Checksums
+    ```
+    {{ .Checksums }}
+    ```
+  name_template: "v{{ .Version }}"
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([^\)]+\))?[:\s].+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\([^\)]+\))?[:\s].+$'
+      order: 1
+    - title: Maintenance
+      regexp: '^.*?chore(\([^\)]+\))?[:\s].+$'
+      order: 2
+    - title: Documentation
+      regexp: '^.*?docs(\([^\)]+\))?[:\s].+$'
+      order: 3
+    - title: Tests
+      regexp: '^.*?test(\([^\)]+\))?[:\s].+$'
+      order: 4
+    - title: Other
+      order: 5
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
