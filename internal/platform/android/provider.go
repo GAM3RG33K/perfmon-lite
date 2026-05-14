@@ -39,6 +39,7 @@ type ADBProvider struct {
 	mu sync.Mutex // protects DeviceID
 
 	// CPU delta tracking — /proc/<pid>/stat utime+stime from previous Sample()
+	cpuMu        sync.Mutex
 	prevPID      int32
 	prevCPUTicks uint64
 	prevCPUTime  time.Time

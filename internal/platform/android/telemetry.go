@@ -99,6 +99,9 @@ func (p *ADBProvider) Sample(pid int32) (*engine.TelemetrySnapshot, error) {
 //
 // utime and stime are measured in clock ticks (typically 100 Hz on Android).
 func (p *ADBProvider) parseCPUStat(output string, pid int32, now time.Time) float64 {
+	p.cpuMu.Lock()
+	defer p.cpuMu.Unlock()
+
 	// Find the closing paren of comm — it's the last ')' before the state char
 	// The format is: pid (comm) state ...
 	closeParen := strings.LastIndex(output, ") ")
