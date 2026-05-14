@@ -340,50 +340,10 @@ func TestParsePSOutput_Processes(t *testing.T) {
 }
 
 // ─── Telemetry Parsing Tests ─────────────────────────────────────────────────
-
-func TestParseTopOutput_Found(t *testing.T) {
-	output := `Processes: 123 total, 2 running
-Load: 2.34
-PID    COMMAND     %CPU  TIME     #TH   #WQ   #PORTS MEM    PURG   CMPRS  PGRP  PPID  STATE    BOOSTED
-1234   ExampleApp  12.5  00:15.34 15    2     123    45M    0B     0B     1234  1     running  *
-`
-	snapshot := parseTopOutput(output, 1234)
-	if snapshot == nil {
-		t.Fatal("expected snapshot, got nil")
-	}
-	if snapshot.CPUPercent < 12.0 || snapshot.CPUPercent > 13.0 {
-		t.Fatalf("expected CPU ~12.5, got %f", snapshot.CPUPercent)
-	}
-	if snapshot.Threads != 15 {
-		t.Fatalf("expected 15 threads, got %d", snapshot.Threads)
-	}
-	// 45M = 45 * 1024 * 1024 bytes = 46080 KB
-	if snapshot.MemoryKB != 46080 {
-		t.Fatalf("expected 46080 KB (45M), got %d", snapshot.MemoryKB)
-	}
-}
-
-func TestParseTopOutput_NotFound(t *testing.T) {
-	output := `PID    COMMAND     %CPU  TIME     #TH
-1234   ExampleApp  12.5  00:15.34 15
-`
-	snapshot := parseTopOutput(output, 9999)
-	if snapshot != nil {
-		t.Fatal("expected nil for unknown PID, got snapshot")
-	}
-}
-
-func TestParseTopOutput_Empty(t *testing.T) {
-	snapshot := parseTopOutput("", 1234)
-	if snapshot != nil {
-		t.Fatal("expected nil for empty output")
-	}
-}
+// ps -p <pid> -o pid=,%cpu=,rss=,comm=  →  no header, space-separated
 
 func TestParsePSSample_Found(t *testing.T) {
-	output := `  PID %CPU  RSS      COMM
- 1234 12.5 46080    /path/to/ExampleApp
-`
+	output := "1234 12.5 46080 /path/to/ExampleApp\n"
 	snapshot := parsePSSample(output, 1234)
 	if snapshot == nil {
 		t.Fatal("expected snapshot, got nil")
@@ -397,10 +357,8 @@ func TestParsePSSample_Found(t *testing.T) {
 }
 
 func TestParsePSSample_NotFound(t *testing.T) {
-	output := `  PID %CPU  RSS
- 1234 12.5 46080
-`
-	snapshot := parsePSSample(output, 9999)
+	output := "9999 12.5 46080 /path/to/Other\n"
+	snapshot := parsePSSample(output, 1234)
 	if snapshot != nil {
 		t.Fatal("expected nil for unknown PID")
 	}
@@ -413,27 +371,31 @@ func TestParsePSSample_Empty(t *testing.T) {
 	}
 }
 
-// ─── Memory Value Parsing Tests ──────────────────────────────────────────────
+func TestParsePSSample_MissingFields(t *testing.T) {
+	output := "1234 12.5\n" // missing RSS and COMM
+	snapshot := parsePSSample(output, 1234)
+	if snapshot != nil {
+		t.Fatal("expected nil for missing fields")
+	}
+}
 
-func TestParseMemoryValue(t *testing.T) {
+// ─── Launch Label Cleaning Tests ─────────────────────────────────────────────
+
+func TestCleanLaunchLabel(t *testing.T) {
 	tests := []struct {
 		input string
-		want  int64
+		want  string
 	}{
-		{"45M", 45 * 1024 * 1024},
-		{"120M", 120 * 1024 * 1024},
-		{"1.2G", 1288490188}, // int64(1.2 * 1024^3) truncated
-		{"46080K", 46080 * 1024},
-		{"512", 512},
-		{"0", 0},
-		{"", 0},
-		{"1.5G", 1610612736}, // int64(1.5 * 1024^3)
+		{"UIKitApplication:in.thetatva.tatva[7140][rb-legacy]", "in.thetatva.tatva"},
+		{"com.apple.springboard", "com.apple.springboard"},
+		{"UIKitApplication:com.apple.Spotlight[eccb][rb-legacy]", "com.apple.Spotlight"},
+		{"", ""},
 	}
 
 	for _, tt := range tests {
-		got := parseMemoryValue(tt.input)
+		got := cleanLaunchLabel(tt.input)
 		if got != tt.want {
-			t.Errorf("parseMemoryValue(%q) = %d, want %d", tt.input, got, tt.want)
+			t.Errorf("cleanLaunchLabel(%q) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }

@@ -62,8 +62,10 @@ func (p *iOSProvider) mapSimulatorProcessesPS(udid string) ([]engine.AppProcess,
 //	1234	0	com.apple.springboard
 //	5678	0	com.example.app
 //	-	78	com.apple.some.daemon
+//	48356	0	UIKitApplication:in.thetatva.tatva[7140][rb-legacy]
 //
 // Lines with "-" as PID are not running (exit status only).
+// UIKitApplication: prefix and [bracket] suffixes are stripped from labels.
 func parseLaunchctlList(output string) []engine.AppProcess {
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	if len(lines) < 2 {
@@ -92,12 +94,11 @@ func parseLaunchctlList(output string) []engine.AppProcess {
 			continue
 		}
 
-		label := fields[2]
+		label := cleanLaunchLabel(fields[2])
 
 		// Derive a friendly app name from the bundle identifier
 		name := label
 		if strings.Contains(label, ".") {
-			// Use the last component of the bundle ID as a friendly name
 			parts := strings.Split(label, ".")
 			if len(parts) > 0 {
 				name = parts[len(parts)-1]
@@ -113,6 +114,23 @@ func parseLaunchctlList(output string) []engine.AppProcess {
 	}
 
 	return processes
+}
+
+// cleanLaunchLabel strips UIKitApplication: prefix and [bracket] suffixes
+// from a launchctl label.
+//
+//	"UIKitApplication:in.thetatva.tatva[7140][rb-legacy]" → "in.thetatva.tatva"
+//	"com.apple.springboard" → "com.apple.springboard"
+func cleanLaunchLabel(label string) string {
+	// Strip UIKitApplication: prefix
+	if idx := strings.Index(label, ":"); idx >= 0 {
+		label = label[idx+1:]
+	}
+	// Strip [bracket] suffixes
+	if idx := strings.Index(label, "["); idx >= 0 {
+		label = label[:idx]
+	}
+	return label
 }
 
 // parsePSOutput parses the output of `ps -A -o pid,comm` from a simulator.

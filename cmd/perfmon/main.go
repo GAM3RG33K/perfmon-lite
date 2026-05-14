@@ -562,8 +562,8 @@ func selectBestProcess(processes []engine.AppProcess) engine.AppProcess {
 		if hasAnyPrefix(name, []string{
 			"android.", "com.android.", "com.google.", "com.google.android.",
 			"com.apple.", "com.samsung.", "com.qualcomm.",
-			"com.android.", "com.google.",
 			"media.", "system.", "zygote",
+			"UIKitApplication:com.apple.",
 		}) {
 			continue
 		}
