@@ -53,6 +53,7 @@ jobs:
   # ─── Cross-platform Build ─────────────────────────────────────────────
   cross-build:
     name: Cross-platform Build
+    needs: [build-and-test]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -173,6 +174,7 @@ jobs:
   release:
     name: Release
     if: startsWith(github.ref, 'refs/tags/v')
+    needs: [cross-build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
