@@ -214,9 +214,11 @@ func main() {
 
 	// Populate the TUI with discovered devices and processes
 	model.SetTargets(discoveredDevices, discoveredProcesses)
+	model.AppPID = initialPID
 
+	appName := resolvedAppName(discoveredProcesses, initialPID)
 	model.Logs.AddEntry("INFO", fmt.Sprintf("Target: %s | App: %s (PID %d)",
-		targetPlatform, discoveredProcesses[0].PackageName, initialPID))
+		targetPlatform, appName, initialPID))
 	model.Logs.AddEntry("INFO", fmt.Sprintf("Polling every %d second(s)", *intervalFlag))
 
 	if *mockMode {
@@ -476,6 +478,19 @@ func matchProcess(processes []engine.AppProcess, appID string) int32 {
 		}
 	}
 	return 0
+}
+
+// resolvedAppName finds the package name matching a PID in the process list.
+func resolvedAppName(processes []engine.AppProcess, pid int32) string {
+	for _, p := range processes {
+		if p.PID == pid {
+			return p.PackageName
+		}
+	}
+	if len(processes) > 0 {
+		return processes[0].PackageName
+	}
+	return "unknown"
 }
 
 // runUninstall removes the perfmon binary and cleans up.

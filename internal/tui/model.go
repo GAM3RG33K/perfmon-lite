@@ -48,6 +48,9 @@ type Model struct {
 	// Export format picker state
 	showFormatPicker bool
 	formatPickerIdx  int
+
+	// PID of the currently selected app (0 = use first process)
+	AppPID int32
 }
 
 func NewModel(eng *engine.Engine, mock bool, platform engine.Platform) *Model {
@@ -269,6 +272,21 @@ func (m *Model) setStatus(msg string) {
 	m.statusTime = time.Now()
 }
 
+// selectedProcess returns the process matching AppPID, or the first process if unset.
+func (m *Model) selectedProcess() *engine.AppProcess {
+	if m.AppPID > 0 {
+		for i := range m.TargetSelector.Processes {
+			if m.TargetSelector.Processes[i].PID == m.AppPID {
+				return &m.TargetSelector.Processes[i]
+			}
+		}
+	}
+	if len(m.TargetSelector.Processes) > 0 {
+		return &m.TargetSelector.Processes[0]
+	}
+	return nil
+}
+
 func (m *Model) handleTick() (tea.Model, tea.Cmd) {
 	return m, tea.Batch(
 		func() tea.Msg { return m.Engine.Poll() },
@@ -315,12 +333,12 @@ func (m *Model) View() string {
 
 	// Target info bar
 	devices := m.TargetSelector.Devices
-	processes := m.TargetSelector.Processes
-	if len(devices) > 0 && len(processes) > 0 {
+	app := m.selectedProcess()
+	if len(devices) > 0 && app != nil {
 		info := fmt.Sprintf(" Target: %s  │  App: %s %s",
 			devices[0].Name,
-			processes[0].PackageName,
-			styles.BuildBadge(processes[0].BuildType),
+			app.PackageName,
+			styles.BuildBadge(app.BuildType),
 		)
 		b.WriteString(styles.LabelStyle.Render(info))
 		b.WriteString("\n")
@@ -493,9 +511,9 @@ func (m *Model) exportCurrentData(formatType export.Format) (string, error) {
 	}
 	appName := "unknown"
 	buildType := engine.BuildUnknown
-	if len(m.TargetSelector.Processes) > 0 {
-		appName = m.TargetSelector.Processes[0].PackageName
-		buildType = m.TargetSelector.Processes[0].BuildType
+	if app := m.selectedProcess(); app != nil {
+		appName = app.PackageName
+		buildType = app.BuildType
 	}
 
 	opts := export.Options{
