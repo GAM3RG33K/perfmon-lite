@@ -4,7 +4,7 @@
 # Usage: .\scripts\update.ps1
 
 $Repo = "GAM3RG33K/perfmon-lite"
-$BinName = "perfmon.exe"
+$BinName = "perfmon-tool.exe"
 
 # ── Locate installed binary ────────────────────────────────────────────
 $BinPath = Get-Command $BinName -ErrorAction SilentlyContinue

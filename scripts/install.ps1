@@ -8,7 +8,7 @@ param(
 )
 
 $Repo = "GAM3RG33K/perfmon-lite"
-$BinName = "perfmon.exe"
+$BinName = "perfmon-tool.exe"
 
 # ── Detect architecture ─────────────────────────────────────────────────
 $Arch = $env:PROCESSOR_ARCHITECTURE
