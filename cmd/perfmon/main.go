@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -58,6 +59,26 @@ func main() {
 	}
 
 	flag.Parse()
+
+	// Handle subcommands
+	args := flag.Args()
+	if len(args) > 0 {
+		switch args[0] {
+		case "devices":
+			runDevices(args[1:], *verboseFlag)
+			os.Exit(exitSuccess)
+		case "export":
+			if len(args) < 2 {
+				fmt.Fprintf(os.Stderr, "Usage: perfmon export <format> [--output <path>]\n")
+				os.Exit(exitGeneralError)
+			}
+			fmt.Fprintf(os.Stderr, "Use --export flag instead: perfmon --mock --export %s\n", args[1])
+			os.Exit(exitGeneralError)
+		case "version":
+			fmt.Printf("perfmon v%s\n", version)
+			os.Exit(exitSuccess)
+		}
+	}
 
 	// Handle version flag
 	if *showVersion {
@@ -606,6 +627,103 @@ func runPreflightWizard() string {
 			return "quit"
 		default:
 			fmt.Println("Invalid choice — please enter a number 1-5.")
+		}
+	}
+}
+
+// runDevices implements the `perfmon devices` subcommand.
+// Flags: --json, --platform, --build-info
+func runDevices(args []string, verbose bool) {
+	var jsonOut, buildInfo bool
+	platformFilter := "all"
+
+	fs := flag.NewFlagSet("devices", flag.ExitOnError)
+	fs.BoolVar(&jsonOut, "json", false, "Output as JSON")
+	fs.StringVar(&platformFilter, "platform", "all", "Filter: android, ios, all")
+	fs.BoolVar(&buildInfo, "build-info", false, "Show build type (Debug/Release)")
+	fs.Parse(args)
+
+	if verbose {
+		log.Printf("devices: json=%v platform=%s build-info=%v", jsonOut, platformFilter, buildInfo)
+	}
+
+	// Collect devices from available platforms
+	type deviceEntry struct {
+		Device    engine.Device    `json:"device"`
+		Processes []engine.AppProcess `json:"processes,omitempty"`
+	}
+	var entries []deviceEntry
+
+	// Android
+	if platformFilter == "all" || platformFilter == "android" {
+		adbPath, err := android.FindAdbPath()
+		if err == nil {
+			prov := android.NewProvider(adbPath)
+			if devices, err := prov.Discover(); err == nil {
+				for _, d := range devices {
+					entry := deviceEntry{Device: d}
+					if buildInfo {
+						prov.SetDevice(d.ID)
+						if procs, err := prov.MapProcesses(d.ID); err == nil {
+							entry.Processes = procs
+						}
+					}
+					entries = append(entries, entry)
+				}
+			}
+		}
+	}
+
+	// iOS
+	if platformFilter == "all" || platformFilter == "ios" {
+		xcrunPath, err := iosPkg.FindXcrunPath()
+		if err == nil {
+			prov := iosPkg.NewProvider(xcrunPath)
+			if devices, err := prov.Discover(); err == nil {
+				prov.CacheDevices(devices)
+				for _, d := range devices {
+					entry := deviceEntry{Device: d}
+					if buildInfo {
+						prov.SetDevice(d.ID)
+						if procs, err := prov.MapProcesses(d.ID); err == nil {
+							entry.Processes = procs
+						}
+					}
+					entries = append(entries, entry)
+				}
+			}
+		}
+	}
+
+	// Output
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(entries); err != nil {
+			fmt.Fprintf(os.Stderr, "JSON output error: %v\n", err)
+		}
+		return
+	}
+
+	if len(entries) == 0 {
+		fmt.Println("No devices found.")
+		fmt.Println("Connect a device or use --mock for development.")
+		return
+	}
+
+	// Group by platform for display
+	fmt.Println("Available Devices:")
+	fmt.Println("──────────────────────────────")
+	for _, e := range entries {
+		typ := "emulator"
+		if e.Device.IsPhysical {
+			typ = "physical"
+		}
+		fmt.Printf("  • %s  %s  (%s, %s)\n", e.Device.ID, e.Device.Name, e.Device.Platform, typ)
+		if buildInfo && len(e.Processes) > 0 {
+			for _, p := range e.Processes {
+				fmt.Printf("      PID %d — %s [%s]\n", p.PID, p.PackageName, p.BuildType)
+			}
 		}
 	}
 }
