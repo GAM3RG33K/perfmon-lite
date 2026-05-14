@@ -264,40 +264,38 @@ func TestParseBuildType_EmptyOutput(t *testing.T) {
 // (baseline is established, no delta to compute).
 func TestParseCPUStat_FirstSample(t *testing.T) {
 	p := &ADBProvider{}
-	statOutput := "1234 (com.example.app) S 1 2 3 4 5 6 7 8 9 10 11 12 100 50 0 0 20 0 1 0 1234567\n"
+	// Fields: state ppid pgrp session tty tpg flags minf cminf majf cmajf UTIME STIME ...
+	// After removing "pid (comm) ", utime=100 at index 11, stime=50 at index 12
+	statOutput := "1234 (com.example.app) S 1 2 3 4 5 6 7 8 9 10 100 50 0 0 20 0 1 0 1234567\n"
 	cpu := p.parseCPUStat(statOutput, 1234, time.Now())
 	if cpu != 0 {
 		t.Fatalf("expected 0 for first sample, got %f", cpu)
 	}
 }
 
-// TestParseCPUStat_Delta verifies CPU% is computed correctly from tick delta.
 func TestParseCPUStat_Delta(t *testing.T) {
 	p := &ADBProvider{}
-	// First sample — establish baseline
-	stat1 := "1234 (com.example.app) S 1 2 3 4 5 6 7 8 9 10 11 12 100 50 0 0 20 0 1 0 1234567\n"
+	// First sample: utime=100, stime=50 → total=150
+	stat1 := "1234 (com.example.app) S 1 2 3 4 5 6 7 8 9 10 100 50 0 0 20 0 1 0 1234567\n"
 	t1 := time.Now()
 	p.parseCPUStat(stat1, 1234, t1)
 
-	// Second sample — 150 more ticks in ~1 second (at clkTick=100, that's 150% CPU)
-	stat2 := "1234 (com.example.app) S 1 2 3 4 5 6 7 8 9 10 11 12 200 100 0 0 20 0 1 0 1234567\n"
+	// Second sample after 1s: utime=200, stime=100 → total=300
+	// Delta = 300-150 = 150 ticks, CPU% = 150/100/1.0*100 = 150%
+	stat2 := "1234 (com.example.app) S 1 2 3 4 5 6 7 8 9 10 200 100 0 0 20 0 1 0 1234567\n"
 	t2 := t1.Add(time.Second)
 	cpu := p.parseCPUStat(stat2, 1234, t2)
-
-	// (200+100) - (100+50) = 150 ticks, 150/100/1.0*100 = 150%
 	if cpu < 145 || cpu > 155 {
 		t.Fatalf("expected CPU ~150%%, got %f", cpu)
 	}
 }
 
-// TestParseCPUStat_PIDChange resets baseline when PID changes.
 func TestParseCPUStat_PIDChange(t *testing.T) {
 	p := &ADBProvider{}
-	stat1 := "1234 (com.example.app) S 1 2 3 4 5 6 7 8 9 10 11 12 100 50 0 0 20 0 1 0 1234567\n"
+	stat1 := "1234 (com.apple.test) S 1 2 3 4 5 6 7 8 9 10 100 50 0 0 20 0 1 0 1234567\n"
 	p.parseCPUStat(stat1, 1234, time.Now())
 
-	// Different PID should reset baseline
-	stat2 := "5678 (othere.app) S 1 2 3 4 5 6 7 8 9 10 11 12 200 100 0 0 20 0 1 0 1234567\n"
+	stat2 := "5678 (com.other.app) S 1 2 3 4 5 6 7 8 9 10 200 100 0 0 20 0 1 0 1234567\n"
 	cpu := p.parseCPUStat(stat2, 5678, time.Now())
 	if cpu != 0 {
 		t.Fatalf("expected 0 on PID change, got %f", cpu)

@@ -130,7 +130,7 @@ func main() {
 				fmt.Printf("  Sample %d: CPU=%.1f%% Memory=%dKB Threads=%d\n",
 					i+1, tm.Snapshot.CPUPercent, tm.Snapshot.MemoryKB, tm.Snapshot.Threads)
 			}
-			time.Sleep(time.Duration(*intervalFlag) * time.Second / 10)
+			time.Sleep(time.Duration(*intervalFlag) * time.Second / 2)
 		}
 
 		snapshots := eng.Buffer.GetAll()
@@ -145,9 +145,17 @@ func main() {
 		}
 		appName := "unknown"
 		buildType := engine.BuildUnknown
-		if len(discoveredProcesses) > 0 {
+		if initialPID > 0 {
+			for _, p := range discoveredProcesses {
+				if p.PID == initialPID {
+					appName = p.PackageName
+					buildType = p.BuildType
+					break
+				}
+			}
+		}
+		if appName == "unknown" && len(discoveredProcesses) > 0 {
 			appName = discoveredProcesses[0].PackageName
-			buildType = discoveredProcesses[0].BuildType
 		}
 
 		var format export.Format
@@ -543,26 +551,57 @@ func tryiOSProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, []
 //  2. The first non-kernel process
 //  3. The first process overall
 func selectBestProcess(processes []engine.AppProcess) engine.AppProcess {
-	// First pass: find user apps (names with a dot)
+	// Pass 1: real user apps — 3+ domain parts, not a known system prefix
 	var userApps []engine.AppProcess
 	for _, p := range processes {
-		if strings.Contains(p.PackageName, ".") &&
-			!strings.HasPrefix(p.PackageName, "android.") &&
-			!strings.HasPrefix(p.PackageName, "com.apple.") {
-			userApps = append(userApps, p)
+		name := p.PackageName
+		if strings.Count(name, ".") < 2 {
+			continue // needs at least com.example.app (3 parts)
 		}
+		// Skip known system/reserved prefixes
+		if hasAnyPrefix(name, []string{
+			"android.", "com.android.", "com.google.", "com.google.android.",
+			"com.apple.", "com.samsung.", "com.qualcomm.",
+			"com.android.", "com.google.",
+			"media.", "system.", "zygote",
+		}) {
+			continue
+		}
+		userApps = append(userApps, p)
 	}
 	if len(userApps) > 0 {
+		// Prefer non-com apps (e.g. in.thetatva.tatva over com.instagram.android)
+		// since user's own apps often use custom domains
+		for _, app := range userApps {
+			if !strings.HasPrefix(app.PackageName, "com.") {
+				return app
+			}
+		}
 		return userApps[0]
 	}
 
-	// Fallback: first non-kernel process
+	// Pass 2: any process with 2+ domain parts
+	for _, p := range processes {
+		if strings.Count(p.PackageName, ".") >= 1 {
+			return p
+		}
+	}
+
+	// Fallback: first process overall
 	if len(processes) > 0 {
 		return processes[0]
 	}
 
-	// Should never get here, but return empty
 	return engine.AppProcess{}
+}
+
+func hasAnyPrefix(s string, prefixes []string) bool {
+	for _, p := range prefixes {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // runPreflightWizard displays an interactive setup wizard when ADB is not found.

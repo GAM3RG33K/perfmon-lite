@@ -113,9 +113,13 @@ func (p *ADBProvider) parseCPUStat(output string, pid int32, now time.Time) floa
 		return -1
 	}
 
-	// utime is field 13 (0-indexed), stime is field 14
-	utime, err1 := strconv.ParseUint(fields[13], 10, 64)
-	stime, err2 := strconv.ParseUint(fields[14], 10, 64)
+	// utime is field 14 (1-indexed) = index 11 after removing "pid (comm) "
+	// stime is field 15 (1-indexed) = index 12 after removing "pid (comm) "
+	if len(fields) < 15 {
+		return -1
+	}
+	utime, err1 := strconv.ParseUint(fields[11], 10, 64)
+	stime, err2 := strconv.ParseUint(fields[12], 10, 64)
 	if err1 != nil || err2 != nil {
 		return -1
 	}
