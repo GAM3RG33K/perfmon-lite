@@ -3,6 +3,7 @@ package android
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/w1n/perfmon/internal/engine"
 )
@@ -259,57 +260,69 @@ func TestParseBuildType_EmptyOutput(t *testing.T) {
 
 // ─── Telemetry Parsing Tests ────────────────────────────────────────────────
 
-func TestParseCPU_Found(t *testing.T) {
-	topOutput := `Tasks: 200 total, 1 running, 199 sleeping
-Mem: 6000000k total, 3000000k used
-Swap: 0k total, 0k used
-100%cpu 12%user 5%nice 30%sys 53%idle 0%iow 0%irq 0%sirq 0%host
-  PID   USER   PR  NI  VIRT  RES   SHR  S  %CPU  %MEM   TIME+   ARGS
- 4567   u0_a   20   0  1.2G  120M  80M  S  12.5   2.3    0:15.34  com.example.app
-`
-	cpu := parseCPU(topOutput, 4567)
-	if cpu < 12.0 || cpu > 13.0 {
-		t.Fatalf("expected CPU ~12.5, got %f", cpu)
+// TestParseCPUStat_FirstSample verifies that the first sample returns 0% CPU
+// (baseline is established, no delta to compute).
+func TestParseCPUStat_FirstSample(t *testing.T) {
+	p := &ADBProvider{}
+	statOutput := "1234 (com.example.app) S 1 2 3 4 5 6 7 8 9 10 11 12 100 50 0 0 20 0 1 0 1234567\n"
+	cpu := p.parseCPUStat(statOutput, 1234, time.Now())
+	if cpu != 0 {
+		t.Fatalf("expected 0 for first sample, got %f", cpu)
 	}
 }
 
-func TestParseCPU_NotFound(t *testing.T) {
-	topOutput := `  PID   USER   PR  NI  VIRT  RES   SHR  S  %CPU  %MEM   TIME+   ARGS
- 4567   u0_a   20   0  1.2G  120M  80M  S  12.5   2.3    0:15.34  com.example.app
-`
-	cpu := parseCPU(topOutput, 9999)
+// TestParseCPUStat_Delta verifies CPU% is computed correctly from tick delta.
+func TestParseCPUStat_Delta(t *testing.T) {
+	p := &ADBProvider{}
+	// First sample — establish baseline
+	stat1 := "1234 (com.example.app) S 1 2 3 4 5 6 7 8 9 10 11 12 100 50 0 0 20 0 1 0 1234567\n"
+	t1 := time.Now()
+	p.parseCPUStat(stat1, 1234, t1)
+
+	// Second sample — 150 more ticks in ~1 second (at clkTick=100, that's 150% CPU)
+	stat2 := "1234 (com.example.app) S 1 2 3 4 5 6 7 8 9 10 11 12 200 100 0 0 20 0 1 0 1234567\n"
+	t2 := t1.Add(time.Second)
+	cpu := p.parseCPUStat(stat2, 1234, t2)
+
+	// (200+100) - (100+50) = 150 ticks, 150/100/1.0*100 = 150%
+	if cpu < 145 || cpu > 155 {
+		t.Fatalf("expected CPU ~150%%, got %f", cpu)
+	}
+}
+
+// TestParseCPUStat_PIDChange resets baseline when PID changes.
+func TestParseCPUStat_PIDChange(t *testing.T) {
+	p := &ADBProvider{}
+	stat1 := "1234 (com.example.app) S 1 2 3 4 5 6 7 8 9 10 11 12 100 50 0 0 20 0 1 0 1234567\n"
+	p.parseCPUStat(stat1, 1234, time.Now())
+
+	// Different PID should reset baseline
+	stat2 := "5678 (othere.app) S 1 2 3 4 5 6 7 8 9 10 11 12 200 100 0 0 20 0 1 0 1234567\n"
+	cpu := p.parseCPUStat(stat2, 5678, time.Now())
+	if cpu != 0 {
+		t.Fatalf("expected 0 on PID change, got %f", cpu)
+	}
+}
+
+// TestParseCPUStat_InvalidOutput returns -1 for unparseable output.
+func TestParseCPUStat_InvalidOutput(t *testing.T) {
+	p := &ADBProvider{}
+	cpu := p.parseCPUStat("not stat output", 1234, time.Now())
 	if cpu != -1 {
-		t.Fatalf("expected -1 for unknown PID, got %f", cpu)
+		t.Fatalf("expected -1 for invalid output, got %f", cpu)
 	}
 }
 
-func TestParseCPU_EmptyOutput(t *testing.T) {
-	cpu := parseCPU("", 1234)
+// TestParseCPUStat_EmptyOutput returns -1 for empty string.
+func TestParseCPUStat_EmptyOutput(t *testing.T) {
+	p := &ADBProvider{}
+	cpu := p.parseCPUStat("", 1234, time.Now())
 	if cpu != -1 {
 		t.Fatalf("expected -1 for empty output, got %f", cpu)
 	}
 }
 
-func TestParseCPU_ZeroCPU(t *testing.T) {
-	topOutput := `  PID   USER   PR  NI  VIRT  RES   SHR  S  %CPU  %MEM   TIME+   ARGS
- 4567   u0_a   20   0  1.2G  120M  80M  S   0.0   2.3    0:15.34  com.example.app
-`
-	cpu := parseCPU(topOutput, 4567)
-	if cpu != 0.0 {
-		t.Fatalf("expected CPU 0.0, got %f", cpu)
-	}
-}
 
-func TestParseCPU_VariedColumnPositions(t *testing.T) {
-	// Some top versions may have slightly different spacing
-	topOutput := `  PID   USER   PR  NI  VIRT  RES   SHR  S  %CPU  %MEM   TIME+   ARGS
- 4567   u0_a   20   0  1.2G  120M  80M  S   8.2   2.3    0:15.34  com.example.app
-`
-	cpu := parseCPU(topOutput, 4567)
-	if cpu < 8.0 || cpu > 8.5 {
-		t.Fatalf("expected CPU ~8.2, got %f", cpu)
-	}
-}
 
 func TestParseVmRSS_Found(t *testing.T) {
 	statusOutput := `Name:   com.example.app

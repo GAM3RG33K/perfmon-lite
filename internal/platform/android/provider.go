@@ -37,6 +37,12 @@ type ADBProvider struct {
 	shellOpen bool
 
 	mu sync.Mutex // protects DeviceID
+
+	// CPU delta tracking — /proc/<pid>/stat utime+stime from previous Sample()
+	prevPID      int32
+	prevCPUTicks uint64
+	prevCPUTime  time.Time
+	firstSample  bool
 }
 
 // NewProvider creates a new Android provider using the given adb binary path.
