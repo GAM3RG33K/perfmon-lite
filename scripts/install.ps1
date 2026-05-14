@@ -52,7 +52,7 @@ Write-Host "  latest release: $Latest"
 
 # ── Download binary ────────────────────────────────────────────────────
 $Version = $Latest.TrimStart("v")
-$Asset = "perfmon_${Version}_windows_${GoArch}"
+$Asset = "perfmon_${Version}_windows_${GoArch}.exe"
 $Url = "https://github.com/${Repo}/releases/download/${Latest}/${Asset}"
 
 $OutFile = Join-Path $InstallDir $BinName
