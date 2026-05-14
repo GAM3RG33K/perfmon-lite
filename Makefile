@@ -68,6 +68,9 @@ github-release: release ## Alias for release
 cut-release: ## Create and push a release tag from the current version
 	@scripts/release.sh
 
+retag: ## Delete existing tag and re-tag to trigger a new CI release build
+	@scripts/release.sh --retag
+
 run: ## Run without mock mode
 	go run ./cmd/perfmon/
 

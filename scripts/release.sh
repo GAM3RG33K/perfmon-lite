@@ -12,25 +12,53 @@ fi
 echo "  detected version: $VERSION"
 echo "  tag:              v$VERSION"
 
+# ── Parse flags ─────────────────────────────────────────────────────────
+RETAG=false
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --retag|-f) RETAG=true; shift ;;
+    *) echo "ERROR: unknown flag $1 (usage: --retag|-f to re-tag)"; exit 1 ;;
+  esac
+done
+
 # ── Checks ──────────────────────────────────────────────────────────────
 if [ -n "$(git status --porcelain)" ]; then
   echo "ERROR: working tree is dirty — commit or stash changes first"
   exit 1
 fi
 
+TAG_EXISTS=false
 if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-  echo "ERROR: tag v$VERSION already exists locally"
-  exit 1
+  TAG_EXISTS=true
+  if [ "$RETAG" = false ]; then
+    echo "ERROR: tag v$VERSION already exists locally (use --retag to replace)"
+    exit 1
+  fi
 fi
 
+# ── Confirm ─────────────────────────────────────────────────────────────
 echo ""
 echo "─── Release Checklist ───"
 echo "  source version:  $VERSION"
-echo "  tag to create:   v$VERSION"
+echo "  tag:             v$VERSION"
 echo "  target branch:   $(git rev-parse --abbrev-ref HEAD)"
+if [ "$TAG_EXISTS" = true ] && [ "$RETAG" = true ]; then
+  echo "  mode:            RETAG (delete existing + recreate)"
+fi
 echo ""
-echo "Press Enter to create and push tag v$VERSION, or Ctrl+C to cancel."
+echo "Press Enter to continue, or Ctrl+C to cancel."
 read -r
+
+# ── Re-tag if needed ────────────────────────────────────────────────────
+if [ "$TAG_EXISTS" = true ] && [ "$RETAG" = true ]; then
+  echo ""
+  echo "  Deleting existing local tag v$VERSION..."
+  git tag -d "v$VERSION" > /dev/null 2>&1
+
+  echo "  Deleting existing remote tag v$VERSION..."
+  git push --delete origin "v$VERSION" 2>/dev/null || \
+    echo "  (no remote tag to delete)"
+fi
 
 # ── Tag and push ─────────────────────────────────────────────────────────
 echo ""
