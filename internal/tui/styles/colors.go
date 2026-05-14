@@ -66,4 +66,30 @@ var (
 	AppStyle = lipgloss.NewStyle().
 			Padding(1, 2).
 			Margin(0, 1)
+
+	StatusBarStyle = lipgloss.NewStyle().
+			Foreground(Green).
+			Padding(0, 1)
+
+	HelpTitle = lipgloss.NewStyle().
+			Foreground(Cyan).
+			Bold(true).
+			Padding(0, 1)
+
+	HelpSectionTitle = lipgloss.NewStyle().
+				Foreground(White).
+				Bold(true).
+				Underline(true).
+				Padding(0, 1)
+
+	HelpKey = lipgloss.NewStyle().
+			Foreground(Cyan).
+			Bold(true)
+
+	HelpDesc = lipgloss.NewStyle().
+			Foreground(DimWhite)
+
+	HelpFooter = lipgloss.NewStyle().
+			Foreground(Amber).
+			Padding(0, 1)
 )

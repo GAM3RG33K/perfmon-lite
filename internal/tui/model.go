@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -21,41 +22,30 @@ const (
 	TabCount
 )
 
-// tab names displayed in the UI
-var tabNames = []string{
-	"Dashboard",
-	"Threads/Procs",
-	"System Logs",
-}
+var tabNames = []string{"Dashboard", "Threads/Procs", "System Logs"}
 
 // Model is the root Bubble Tea model for the perfmon TUI.
 type Model struct {
-	// Engine
 	Engine *engine.Engine
 	Mock   bool
 
-	// Tabs
 	ActiveTab int
 
-	// Views
 	Dashboard      *views.DashboardView
 	TargetSelector *views.TargetSelectorView
 	Logs           *views.LogsView
 
-	// Runtime state
-	Platform engine.Platform
-
-	// Layout
-	Width  int
-	Height int
-
-	// App state
-	Ready    bool
-	Quitting bool
-	Err      error
+	Platform   engine.Platform
+	Width      int
+	Height     int
+	Ready      bool
+	Quitting   bool
+	Err        error
+	ShowHelp   bool
+	statusMsg  string
+	statusTime time.Time
 }
 
-// NewModel creates a new TUI model.
 func NewModel(eng *engine.Engine, mock bool, platform engine.Platform) *Model {
 	return &Model{
 		Engine:         eng,
@@ -70,18 +60,23 @@ func NewModel(eng *engine.Engine, mock bool, platform engine.Platform) *Model {
 	}
 }
 
-// Init initializes the model and returns the initial commands.
 func (m *Model) Init() tea.Cmd {
 	m.Logs.AddEntry("INFO", "perfmon starting...")
-
 	if m.Mock {
 		m.Logs.AddEntry("INFO", "Mock mode enabled — generating simulated telemetry")
 	}
-
 	return m.Engine.Start()
 }
 
-// Update handles all incoming messages and returns the updated model.
+// ClearStatusMsg is sent after a short delay to clear the status bar.
+type ClearStatusMsg struct{}
+
+func clearStatusAfter(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(t time.Time) tea.Msg {
+		return ClearStatusMsg{}
+	})
+}
+
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
@@ -89,15 +84,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Width = msg.Width
 		m.Height = msg.Height
 		m.Ready = true
-
-		// Update view dimensions
 		m.Dashboard.Width = msg.Width - 4
 		m.Dashboard.Height = msg.Height - 8
 		m.TargetSelector.Width = msg.Width - 4
 		m.TargetSelector.Height = msg.Height - 8
 		m.Logs.Width = msg.Width - 4
 		m.Logs.Height = msg.Height - 8
-
 		return m, nil
 
 	case tea.KeyMsg:
@@ -109,13 +101,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case engine.TelemetryMsg:
 		return m.handleTelemetry(msg)
 
+	case ClearStatusMsg:
+		m.statusMsg = ""
+		return m, nil
+
 	default:
 		return m, nil
 	}
 }
 
-// handleKeyMsg processes keyboard input.
 func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// If help is open, only handle escape/enter to close
+	if m.ShowHelp {
+		switch msg.String() {
+		case "?", "q", "esc", "enter", "ctrl+c":
+			m.ShowHelp = false
+		}
+		return m, nil
+	}
+
 	switch msg.String() {
 
 	case "q", "ctrl+c":
@@ -126,15 +130,19 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "tab":
 		m.ActiveTab = (m.ActiveTab + 1) % TabCount
+		return m, nil
 
 	case "shift+tab":
 		m.ActiveTab = (m.ActiveTab - 1 + TabCount) % TabCount
+		return m, nil
 
 	case "left":
 		m.ActiveTab = (m.ActiveTab - 1 + TabCount) % TabCount
+		return m, nil
 
 	case "right":
 		m.ActiveTab = (m.ActiveTab + 1) % TabCount
+		return m, nil
 
 	case "up":
 		switch m.ActiveTab {
@@ -147,6 +155,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.TargetSelector.SelectedDevice--
 			}
 		}
+		return m, nil
 
 	case "down":
 		switch m.ActiveTab {
@@ -159,110 +168,140 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.TargetSelector.SelectedDevice++
 			}
 		}
+		return m, nil
 
 	case "enter":
 		if m.ActiveTab == TabThreads && len(m.TargetSelector.Processes) > 0 {
 			m.TargetSelector.ShowProcesses = true
 		}
+		return m, nil
 
 	case "r":
+		m.setStatus("⟳ Refreshing...")
 		m.Logs.AddEntry("INFO", "Refreshing...")
+		return m, nil
 
 	case "e":
 		path, err := m.exportCurrentData(export.FormatJSON)
 		if err != nil {
 			m.Logs.AddEntry("ERROR", fmt.Sprintf("Export failed: %v", err))
+			m.setStatus(styles.ErrorStyle.Render("✗ Export failed"))
 		} else {
 			m.Logs.AddEntry("INFO", fmt.Sprintf("Exported to %s", path))
+			m.setStatus(fmt.Sprintf("✓ Exported to %s", path))
 		}
+		return m, nil
 
-	case "E": // Shift+E for Markdown
+	case "E":
 		path, err := m.exportCurrentData(export.FormatMD)
 		if err != nil {
 			m.Logs.AddEntry("ERROR", fmt.Sprintf("Export failed: %v", err))
+			m.setStatus(styles.ErrorStyle.Render("✗ Export failed"))
 		} else {
 			m.Logs.AddEntry("INFO", fmt.Sprintf("Exported to %s", path))
+			m.setStatus(fmt.Sprintf("✓ Exported to %s", path))
 		}
+		return m, nil
 
-	case "ctrl+e": // Ctrl+E for HTML
+	case "ctrl+e":
 		path, err := m.exportCurrentData(export.FormatHTML)
 		if err != nil {
 			m.Logs.AddEntry("ERROR", fmt.Sprintf("Export failed: %v", err))
+			m.setStatus(styles.ErrorStyle.Render("✗ Export failed"))
 		} else {
 			m.Logs.AddEntry("INFO", fmt.Sprintf("Exported to %s", path))
+			m.setStatus(fmt.Sprintf("✓ Exported to %s", path))
 		}
+		return m, nil
 
 	case "?":
-		m.Logs.AddEntry("INFO", "Help: [TAB] Switch Tabs  [↑/↓] Navigate  [Enter] Select  [e] Export  [r] Refresh  [q] Quit")
+		m.ShowHelp = true
+		return m, nil
 
 	case "1":
 		m.ActiveTab = TabDashboard
+		return m, nil
 	case "2":
 		m.ActiveTab = TabThreads
+		return m, nil
 	case "3":
 		m.ActiveTab = TabLogs
-	}
-
-	return m, nil
-}
-
-// handleTick processes a polling tick from the engine.
-func (m *Model) handleTick() (tea.Model, tea.Cmd) {
-	return m, tea.Batch(
-		func() tea.Msg { return m.Engine.Poll() },
-		m.Engine.Start(), // schedule next tick
-	)
-}
-
-// handleTelemetry processes a telemetry message from the engine.
-func (m *Model) handleTelemetry(msg engine.TelemetryMsg) (tea.Model, tea.Cmd) {
-	if msg.Error != nil {
-		m.Logs.AddEntry("ERROR", msg.Error.Error())
 		return m, nil
 	}
 
 	return m, nil
 }
 
-// View renders the complete TUI.
+// setStatus sets a status message that auto-clears after 3 seconds.
+func (m *Model) setStatus(msg string) {
+	m.statusMsg = msg
+	m.statusTime = time.Now()
+}
+
+func (m *Model) handleTick() (tea.Model, tea.Cmd) {
+	return m, tea.Batch(
+		func() tea.Msg { return m.Engine.Poll() },
+		m.Engine.Start(),
+	)
+}
+
+func (m *Model) handleTelemetry(msg engine.TelemetryMsg) (tea.Model, tea.Cmd) {
+	if msg.Error != nil {
+		m.Logs.AddEntry("ERROR", msg.Error.Error())
+		return m, nil
+	}
+	// Auto-clear status after 3 seconds
+	if m.statusMsg != "" && time.Since(m.statusTime) > 3*time.Second {
+		m.statusMsg = ""
+	}
+	return m, nil
+}
+
 func (m *Model) View() string {
 	if !m.Ready {
 		return "\n  Initializing perfmon..."
 	}
-
 	if m.Quitting {
 		return "\n  Goodbye!\n"
 	}
-
 	if m.Err != nil {
 		return fmt.Sprintf("\n  Error: %v\n", m.Err)
+	}
+
+	if m.ShowHelp {
+		return m.renderHelp()
 	}
 
 	var b strings.Builder
 
 	// Title bar
-	title := fmt.Sprintf(" perfmon v1.0.0 %s", styles.PlatformBadge(engine.PlatformMock))
+	title := fmt.Sprintf(" perfmon v1.0.0 %s", styles.PlatformBadge(m.Platform))
 	b.WriteString(styles.TitleStyle.Render(title))
 	b.WriteString("\n")
 
 	// Target info bar
-	if m.Mock {
-		dev := m.TargetSelector.Devices
-		proc := m.TargetSelector.Processes
-		if len(dev) > 0 && len(proc) > 0 {
-			info := fmt.Sprintf(" Target: %s  │  App: %s %s",
-				dev[0].Name,
-				proc[0].PackageName,
-				styles.BuildBadge(proc[0].BuildType),
-			)
-			b.WriteString(styles.LabelStyle.Render(info))
-			b.WriteString("\n")
-		}
+	devices := m.TargetSelector.Devices
+	processes := m.TargetSelector.Processes
+	if len(devices) > 0 && len(processes) > 0 {
+		info := fmt.Sprintf(" Target: %s  │  App: %s %s",
+			devices[0].Name,
+			processes[0].PackageName,
+			styles.BuildBadge(processes[0].BuildType),
+		)
+		b.WriteString(styles.LabelStyle.Render(info))
+		b.WriteString("\n")
+	}
+
+	// Status bar (brief notifications)
+	if m.statusMsg != "" {
+		statusLine := styles.StatusBarStyle.Render(m.statusMsg)
+		b.WriteString(statusLine)
+		b.WriteString("\n")
 	}
 
 	// Separator
-	separator := strings.Repeat("─", m.Width-2)
-	b.WriteString(styles.LabelStyle.Render(separator))
+	sep := strings.Repeat("─", m.Width-2)
+	b.WriteString(styles.LabelStyle.Render(sep))
 	b.WriteString("\n")
 
 	// Tabs
@@ -275,20 +314,16 @@ func (m *Model) View() string {
 	if bodyWidth < 10 {
 		bodyWidth = 10
 	}
-
 	switch m.ActiveTab {
 	case TabDashboard:
 		snapshots := m.Engine.Buffer.GetAll()
 		latest := m.Engine.Buffer.Latest()
 		body = m.Dashboard.Render(snapshots, latest)
-
 	case TabThreads:
 		body = m.TargetSelector.Render()
-
 	case TabLogs:
 		body = m.Logs.Render()
 	}
-
 	b.WriteString(styles.PanelBorder.Width(bodyWidth).Render(body))
 	b.WriteString("\n")
 
@@ -298,7 +333,61 @@ func (m *Model) View() string {
 	return b.String()
 }
 
-// renderTabs draws the tab bar dynamically sized to the terminal width.
+// renderHelp shows a full-screen help overlay.
+func (m *Model) renderHelp() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(styles.HelpTitle.Render("  perfmon — Help"))
+	b.WriteString("\n\n")
+
+	sections := []struct {
+		title string
+		keys  [][2]string
+	}{
+		{
+			"Navigation",
+			 [][2]string{
+				{"↑/↓", "Navigate lists"},
+				{"←/→", "Switch tabs"},
+				{"Tab", "Cycle forward"},
+				{"Shift+Tab", "Cycle backward"},
+				{"1-3", "Jump to tab"},
+			},
+		},
+		{
+			"Actions",
+			[][2]string{
+				{"Enter", "Select item / show processes"},
+				{"e", "Export to JSON"},
+				{"Shift+E", "Export to Markdown"},
+				{"Ctrl+E", "Export to HTML"},
+				{"r", "Refresh device list"},
+			},
+		},
+		{
+			"General",
+			[][2]string{
+				{"?", "Toggle this help"},
+				{"q / Ctrl+C", "Quit"},
+			},
+		},
+	}
+
+	for _, section := range sections {
+		b.WriteString(styles.HelpSectionTitle.Render("  " + section.title))
+		b.WriteString("\n")
+		for _, pair := range section.keys {
+			key := styles.HelpKey.Render("    " + pair[0])
+			desc := styles.HelpDesc.Render(pair[1])
+			b.WriteString(fmt.Sprintf("%s  %s\n", key, desc))
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString(styles.HelpFooter.Render("  Press [?], Esc, Enter, or q to close help"))
+	return b.String()
+}
+
 func (m *Model) renderTabs() string {
 	var tabs []string
 	for i, name := range tabNames {
@@ -308,12 +397,10 @@ func (m *Model) renderTabs() string {
 			tabs = append(tabs, styles.InactiveTabBorder.Render(name))
 		}
 	}
-
 	tabLine := lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
 	return styles.PanelBorder.Width(m.Width - 4).Render(tabLine)
 }
 
-// renderFooter draws the command footer dynamically sized to the terminal width.
 func (m *Model) renderFooter() string {
 	hints := []string{
 		"[↑/↓] Navigate",
@@ -325,7 +412,6 @@ func (m *Model) renderFooter() string {
 		"[?] Help",
 		"[q] Quit",
 	}
-
 	footerWidth := m.Width - 2
 	if footerWidth < 20 {
 		footerWidth = 20
@@ -333,22 +419,18 @@ func (m *Model) renderFooter() string {
 	return styles.FooterStyle.Width(footerWidth).Render(strings.Join(hints, "  "))
 }
 
-// exportCurrentData exports the current ring buffer to the given format.
 func (m *Model) exportCurrentData(formatType export.Format) (string, error) {
 	snapshots := m.Engine.Buffer.GetAll()
 	if len(snapshots) == 0 {
 		return "", fmt.Errorf("no telemetry data to export")
 	}
 
-	// Gather metadata from the model state
 	deviceName := "unknown"
 	if len(m.TargetSelector.Devices) > 0 {
 		deviceName = m.TargetSelector.Devices[0].Name
 	}
-
 	appName := "unknown"
 	buildType := engine.BuildUnknown
-	platform := m.Platform
 	if len(m.TargetSelector.Processes) > 0 {
 		appName = m.TargetSelector.Processes[0].PackageName
 		buildType = m.TargetSelector.Processes[0].BuildType
@@ -356,30 +438,24 @@ func (m *Model) exportCurrentData(formatType export.Format) (string, error) {
 
 	opts := export.Options{
 		Format:     formatType,
-		OutputPath: "", // empty = auto-generate filename
+		OutputPath: "",
 		Version:    "1.0.0",
-		Platform:   platform,
+		Platform:   m.Platform,
 		DeviceName: deviceName,
 		AppName:    appName,
 		BuildType:  buildType,
 	}
-
-	// Resolve path and ensure directory
 	opts.OutputPath = export.ResolveOutputPath(opts, snapshots)
 	if err := export.EnsureOutputDir(opts.OutputPath); err != nil {
 		return "", fmt.Errorf("creating output directory: %w", err)
 	}
-
 	path, err := export.Export(snapshots, opts)
 	if err != nil {
 		return "", fmt.Errorf("export: %w", err)
 	}
-
 	return path, nil
 }
 
-// SetTargets populates the device and process data into the TUI views.
-// Used both in mock mode and when connected to a real device.
 func (m *Model) SetTargets(devices []engine.Device, processes []engine.AppProcess) {
 	m.TargetSelector.Devices = devices
 	m.TargetSelector.Processes = processes
