@@ -188,6 +188,19 @@ function ScrollReveal({ children, delay = 0 }) {
 
 /* ─── App ────────────────────────────────────────────────── */
 
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      className={`copy-btn ${copied ? 'copied' : ''}`}
+      onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+      title="Copy command"
+    >
+      {copied ? '✓' : '⎘'}
+    </button>
+  )
+}
+
 export default function App() {
   const lines = useTypewriter(TYPING_LINES, 18)
   const mouse = useMousePos()
@@ -271,16 +284,22 @@ export default function App() {
                 <span className={`install-tab ${installTab === 'unix' ? 'active' : ''}`} onClick={() => setInstallTab('unix')}>macOS / Linux</span>
                 <span className={`install-tab ${installTab === 'win' ? 'active' : ''}`} onClick={() => setInstallTab('win')}>Windows</span>
               </div>
-              <div className="code-block" style={{
+              <div className="code-wrap" style={{
                 transform: `perspective(400px) rotateX(${(mouse.y - 0.5) * 2}deg)`,
               }}>
-                {installTab === 'unix' ? (
-                  <><span className="comment"># macOS / Linux</span>
-                  <br /><span className="prompt">$</span> curl -sfL https://get.perfmon.qzz.io | bash</>
-                ) : (
-                  <><span className="comment"># Windows (PowerShell)</span>
-                  <br /><span className="prompt">PS&gt;</span> iwr https://get.perfmon.qzz.io/windows -useb | iex</>
-                )}
+                <div className="code-block">
+                  {installTab === 'unix' ? (
+                    <><span className="comment"># macOS / Linux</span>
+                    <br /><span className="prompt">$</span> curl -sfL https://get.perfmon.qzz.io | bash</>
+                  ) : (
+                    <><span className="comment"># Windows (PowerShell)</span>
+                    <br /><span className="prompt">PS&gt;</span> iwr https://get.perfmon.qzz.io/windows -useb | iex</>
+                  )}
+                </div>
+                <CopyButton text={installTab === 'unix'
+                  ? 'curl -sfL https://get.perfmon.qzz.io | bash'
+                  : 'iwr https://get.perfmon.qzz.io/windows -useb | iex'
+                } />
               </div>
             </div>
           </ScrollReveal>
