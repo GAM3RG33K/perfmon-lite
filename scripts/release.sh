@@ -2,10 +2,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION=$(grep -E '\bversion\s*=' "$ROOT/cmd/perfmon/main.go" | sed 's/.*"\(.*\)".*/\1/')
+VERSION=$(cat "$ROOT/VERSION" 2>/dev/null || echo "dev")
 
-if [ -z "$VERSION" ]; then
-  echo "ERROR: could not detect version from cmd/perfmon/main.go"
+if [ -z "$VERSION" ] || [ "$VERSION" = "dev" ]; then
+  echo "ERROR: could not detect version from VERSION file"
   exit 1
 fi
 

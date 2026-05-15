@@ -1,19 +1,18 @@
 .PHONY: build cross-build run mock test test-short test-adb lint fmt clean tidy dev all release github-release hooks cut-release retag install update
 
 APP_NAME := perfmon
-GO_FLAGS := -ldflags="-s -w"
 COVERAGE_FILE := coverage.out
 DIST_DIR := dist
 
-# Auto-detect version from source; override with: make release VERSION=1.1.0
-VERSION ?= $(shell grep -E '\bversion\s*=' cmd/perfmon/main.go | sed 's/.*"\(.*\)".*/\1/')
+# Read version from VERSION file; override with: make build VERSION=1.0.0
+VERSION ?= $(shell cat VERSION 2>/dev/null || echo "dev")
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 build: ## Build the binary
-	go build -o $(APP_NAME) $(GO_FLAGS) ./cmd/perfmon/
+	go build -o $(APP_NAME) -ldflags="-s -w -X main.version=$(VERSION)" ./cmd/perfmon/
 
 cross-build: ## Build binaries for all platforms (linux/darwin/windows x amd64/arm64)
 	@mkdir -p $(DIST_DIR)

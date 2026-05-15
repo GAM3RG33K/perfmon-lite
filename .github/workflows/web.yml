@@ -29,8 +29,13 @@ jobs:
           cache: npm
           cache-dependency-path: ./web/package-lock.json
 
+      - name: Read VERSION
+        run: echo "VITE_APP_VERSION=$(cat VERSION)" >> $GITHUB_ENV
+
       - run: npm ci
       - run: npm run build
+        env:
+          VITE_APP_VERSION: ${{ env.VITE_APP_VERSION }}
 
       - uses: actions/configure-pages@v5
 

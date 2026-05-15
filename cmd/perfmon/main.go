@@ -34,7 +34,7 @@ const (
 	exitExportError   = 4
 )
 
-var version = "0.0.1"
+var version = "dev" // overridden by -X main.version=$(cat VERSION) at build
 
 func main() {
 	// ── CLI flags ───────────────────────────────────────────────────────

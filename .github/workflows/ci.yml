@@ -202,7 +202,7 @@ jobs:
       - name: Upload installer scripts as release assets
         run: |
           TAG="${GITHUB_REF_NAME}"
-          for script in scripts/install.sh scripts/update.sh scripts/uninstall.sh scripts/install.ps1 scripts/update.ps1 scripts/uninstall.ps1 scripts/worker.js docs/index.html docs/CNAME web/src/main.jsx web/src/App.jsx web/src/index.css web/index.html web/vite.config.js web/package.json web/public/CNAME; do
+          for script in scripts/install.sh scripts/update.sh scripts/uninstall.sh scripts/install.ps1 scripts/update.ps1 scripts/uninstall.ps1 scripts/worker.js docs/index.html docs/CNAME VERSION web/src/main.jsx web/src/App.jsx web/src/index.css web/index.html web/vite.config.js web/package.json web/public/CNAME; do
             echo "  uploading ${script}..."
             gh release upload "$TAG" "$script" --clobber
           done

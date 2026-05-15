@@ -18,7 +18,7 @@ const COMMANDS = [
 ]
 
 const TYPING_LINES = [
-  { text: 'perfmon v0.0.1 — Mobile Performance Monitor', cls: 'dim' },
+  { text: `perfmon v${import.meta.env.VITE_APP_VERSION || 'dev'} — Mobile Performance Monitor`, cls: 'dim' },
   { text: '', cls: '' },
   { text: '┌──────────────────────────────────────────────────┐', cls: 'dim' },
   { text: '│  Target: Pixel 8  │  App: com.example.app  [DEBUG]  │', cls: 'dim' },
@@ -215,7 +215,7 @@ export default function App() {
 
       <ParallaxSection speed={-0.08}>
         <header className="hero">
-          <div className="hero-badge">v0.0.1 &nbsp;·&nbsp; Beta</div>
+          <div className="hero-badge">v{import.meta.env.VITE_APP_VERSION || 'dev'} &nbsp;·&nbsp; Beta</div>
           <h1>perfmon <span className="accent">⎈</span></h1>
           <p className="hero-desc">Blistering-fast, terminal-based mobile app profiling. CPU, memory, and thread telemetry for Android and iOS — right in your terminal.</p>
           <div className="cta-row">
