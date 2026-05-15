@@ -271,6 +271,22 @@ body {
 
 .install-box h2 { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 24px; }
 
+.install-platform-tabs {
+  display: flex; gap: 4px; margin-bottom: 12px;
+  background: var(--bg); border-radius: 8px; padding: 4px;
+}
+
+.install-tab {
+  flex: 1; text-align: center; padding: 8px 12px;
+  border-radius: 6px; font-size: 13px; font-weight: 500;
+  cursor: pointer; color: var(--dim); background: transparent;
+  transition: all 0.2s; user-select: none;
+}
+
+.install-tab.active {
+  background: var(--cyan); color: #000; font-weight: 600;
+}
+
 .code-block {
   background: #000; border: 1px solid var(--border);
   border-radius: 8px; padding: 16px;

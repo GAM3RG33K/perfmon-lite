@@ -191,6 +191,7 @@ function ScrollReveal({ children, delay = 0 }) {
 export default function App() {
   const lines = useTypewriter(TYPING_LINES, 18)
   const mouse = useMousePos()
+  const [installTab, setInstallTab] = useState('unix')
 
   return (
     <div className="app">
@@ -266,13 +267,21 @@ export default function App() {
           <ScrollReveal>
             <div className="install-box">
               <h2>Install in seconds</h2>
+              <div className="install-platform-tabs">
+                <span className={`install-tab ${installTab === 'unix' ? 'active' : ''}`} onClick={() => setInstallTab('unix')}>macOS / Linux</span>
+                <span className={`install-tab ${installTab === 'win' ? 'active' : ''}`} onClick={() => setInstallTab('win')}>Windows</span>
+              </div>
               <div className="code-block" style={{
                 transform: `perspective(400px) rotateX(${(mouse.y - 0.5) * 2}deg)`,
               }}>
-                <span className="comment"># macOS / Linux</span>
-                <br /><span className="prompt">$</span> curl -sfL https://get.perfmon.qzz.io | bash
+                {installTab === 'unix' ? (
+                  <><span className="comment"># macOS / Linux</span>
+                  <br /><span className="prompt">$</span> curl -sfL https://get.perfmon.qzz.io | bash</>
+                ) : (
+                  <><span className="comment"># Windows (PowerShell)</span>
+                  <br /><span className="prompt">PS&gt;</span> iwr https://get.perfmon.qzz.io/windows -useb | iex</>
+                )}
               </div>
-              <p className="install-note">Windows: <code>iwr https://get.perfmon.qzz.io/windows -useb | iex</code></p>
             </div>
           </ScrollReveal>
         </section>
