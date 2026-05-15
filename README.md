@@ -77,6 +77,24 @@ iwr https://perfmon.qzz.io/windows -useb | iex
 > On macOS you may need to add `~/.local/bin` to your PATH.
 > On Windows, the installer adds `%LOCALAPPDATA%\perfmon` to your user PATH — restart your terminal.
 
+### One-liner update
+
+**macOS / Linux:**
+```bash
+curl -sfL https://perfmon.qzz.io/update | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+iwr https://perfmon.qzz.io/update/windows -useb | iex
+```
+
+Or use the built-in update subcommand:
+
+```bash
+perfmon update
+```
+
 ### One-liner uninstall
 
 **macOS / Linux:**

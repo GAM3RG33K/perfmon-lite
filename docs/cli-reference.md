@@ -23,6 +23,7 @@ A blistering-fast, standalone, terminal-based mobile app profiler that provides 
 | `perfmon [flags]` | Launch interactive TUI (auto-detect platform) |
 | `perfmon devices [flags]` | List connected devices and simulators |
 | `perfmon uninstall` | Remove perfmon binary from system |
+| `perfmon update` | Check for newer version on GitHub and upgrade |
 
 ## 3. Global Flags
 

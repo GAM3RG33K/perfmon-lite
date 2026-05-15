@@ -5,10 +5,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -54,6 +57,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  perfmon [flags]\n")
 		fmt.Fprintf(os.Stderr, "  perfmon devices [flags]\n")
 		fmt.Fprintf(os.Stderr, "  perfmon uninstall\n")
+		fmt.Fprintf(os.Stderr, "  perfmon update\n")
 		fmt.Fprintf(os.Stderr, "\nFlags:\n")
 		flag.PrintDefaults()
 	}
@@ -69,6 +73,9 @@ func main() {
 			os.Exit(exitSuccess)
 		case "uninstall":
 			runUninstall()
+			return
+		case "update":
+			runUpdate(*verboseFlag)
 			return
 		}
 	}
@@ -542,6 +549,130 @@ func runUninstall() {
 		return
 	}
 	fmt.Println("  perfmon uninstalled successfully!")
+}
+
+// runUpdate checks for a newer release on GitHub and replaces the current binary.
+func runUpdate(verbose bool) {
+	binPath, err := os.Executable()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: cannot determine binary path: %v\n", err)
+		os.Exit(exitGeneralError)
+	}
+	binPath, _ = filepath.EvalSymlinks(binPath)
+
+	fmt.Printf("  Current version: v%s\n", version)
+
+	fmt.Print("  Checking for updates...")
+	apiURL := "https://api.github.com/repos/GAM3RG33K/perfmon-lite/releases/latest"
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "\n  Error fetching latest release: %v\n", err)
+		os.Exit(exitGeneralError)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintf(os.Stderr, "\n  GitHub API returned HTTP %d\n", resp.StatusCode)
+		os.Exit(exitGeneralError)
+	}
+
+	var release struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		fmt.Fprintf(os.Stderr, "\n  Error parsing release info: %v\n", err)
+		os.Exit(exitGeneralError)
+	}
+
+	latestTag := release.TagName
+	latestVer := strings.TrimPrefix(latestTag, "v")
+	fmt.Printf(" %s\n", latestTag)
+
+	// Compare versions
+	if latestVer == version {
+		fmt.Println("  ✓ perfmon is already up to date")
+		return
+	}
+
+	fmt.Printf("  New version available: %s\n", latestTag)
+
+	// Determine asset name for current platform
+	goos := runtime.GOOS
+	goarch := runtime.GOARCH
+	var assetName string
+	switch goos {
+	case "windows":
+		assetName = fmt.Sprintf("perfmon-tool_%s_%s_%s.exe", latestVer, goos, goarch)
+	default:
+		assetName = fmt.Sprintf("perfmon_%s_%s_%s", latestVer, goos, goarch)
+	}
+
+	url := fmt.Sprintf("https://github.com/GAM3RG33K/perfmon-lite/releases/download/%s/%s", latestTag, assetName)
+	_ = verbose
+
+	fmt.Printf("  Downloading %s...\n", assetName)
+	dlResp, err := http.Get(url)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  Download failed: %v\n", err)
+		os.Exit(exitGeneralError)
+	}
+	defer dlResp.Body.Close()
+
+	if dlResp.StatusCode != http.StatusOK {
+		fmt.Fprintf(os.Stderr, "  Download failed: HTTP %d\n", dlResp.StatusCode)
+		os.Exit(exitGeneralError)
+	}
+
+	// Download to temp file
+	tmpPath := binPath + ".new"
+	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  Cannot create temp file: %v\n", err)
+		os.Exit(exitGeneralError)
+	}
+
+	written, err := io.Copy(f, dlResp.Body)
+	f.Close()
+	if err != nil {
+		os.Remove(tmpPath)
+		fmt.Fprintf(os.Stderr, "  Download failed: %v\n", err)
+		os.Exit(exitGeneralError)
+	}
+	fmt.Printf("  Downloaded %d bytes\n", written)
+
+	// Replace the current binary
+	if err := os.Rename(tmpPath, binPath); err != nil {
+		// Cross-device rename may fail; try copy + remove
+		if err := copyAndRemove(tmpPath, binPath); err != nil {
+			os.Remove(tmpPath)
+			fmt.Fprintf(os.Stderr, "  Update failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, "  Try running with sudo/admin or move manually: mv %s %s\n", tmpPath, binPath)
+			os.Exit(exitGeneralError)
+		}
+	}
+
+	fmt.Println("  ✓ perfmon updated successfully!")
+	fmt.Printf("  Restart perfmon to use v%s\n", latestVer)
+}
+
+// copyAndRemove copies src to dst, preserving permissions, then removes src.
+func copyAndRemove(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	return os.Remove(src)
 }
 
 // tryiOSProvider attempts to set up the iOS provider.
