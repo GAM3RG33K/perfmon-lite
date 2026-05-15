@@ -24,7 +24,18 @@ body {
 
 .app { position: relative; min-height: 100vh; }
 
-/* Background */
+/* ─── Parallax Background ───────────────────────────────── */
+
+.parallax-bg {
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(0,255,255,0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(255,0,255,0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(0,255,136,0.02) 0%, transparent 50%);
+  will-change: transform;
+  pointer-events: none;
+}
+
 .bg-grid {
   position: fixed; inset: 0; z-index: 0;
   background-image:
@@ -35,17 +46,40 @@ body {
 }
 
 .bg-glow {
-  position: fixed; top: -40vh; left: 50%; transform: translateX(-50%);
-  width: 800px; height: 800px;
-  background: radial-gradient(circle, rgba(0,255,255,0.06) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
+  position: fixed; top: -30vh; left: 50%;
+  width: 900px; height: 900px;
+  background: radial-gradient(circle, rgba(0,255,255,0.08) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+  will-change: transform;
 }
 
-/* Hero */
+/* ─── Floating Symbols ──────────────────────────────────── */
+
+.floaters {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  overflow: hidden;
+}
+
+.floater {
+  position: absolute;
+  font-family: 'SF Mono', 'Cascadia Code', monospace;
+  font-weight: 700;
+  color: var(--cyan);
+  will-change: transform;
+  animation: floatPulse 4s ease-in-out infinite;
+  user-select: none;
+}
+
+@keyframes floatPulse {
+  0%, 100% { opacity: 0.04; }
+  50% { opacity: 0.09; }
+}
+
+/* ─── Hero ───────────────────────────────────────────────── */
+
 .hero {
   position: relative; z-index: 1;
-  padding: 120px 24px 60px; text-align: center;
+  padding: 140px 24px 60px; text-align: center;
 }
 
 .hero-badge {
@@ -53,8 +87,9 @@ body {
   font-size: 12px; font-weight: 600; letter-spacing: 1.5px;
   text-transform: uppercase; color: var(--cyan);
   border: 1px solid var(--cyan); border-radius: 100px;
-  padding: 4px 14px; margin-bottom: 24px;
+  padding: 4px 14px; margin-bottom: 28px;
   opacity: 0.6; animation: fadeIn 1s ease;
+  backdrop-filter: blur(4px);
 }
 
 .hero h1 {
@@ -63,7 +98,17 @@ body {
   margin-bottom: 16px; animation: fadeUp 0.8s ease;
 }
 
-.hero h1 .accent { color: var(--cyan); text-shadow: 0 0 40px rgba(0,255,255,0.3); }
+.hero h1 .accent {
+  color: var(--cyan);
+  text-shadow: 0 0 60px rgba(0,255,255,0.3);
+  display: inline-block;
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0%, 100% { text-shadow: 0 0 40px rgba(0,255,255,0.2); }
+  50% { text-shadow: 0 0 80px rgba(0,255,255,0.5); }
+}
 
 .hero-desc {
   font-size: 18px; color: var(--dim);
@@ -85,8 +130,8 @@ body {
   box-shadow: 0 0 30px rgba(0,255,255,0.15);
 }
 .btn-primary:hover {
-  box-shadow: 0 0 50px rgba(0,255,255,0.3);
-  transform: translateY(-2px);
+  box-shadow: 0 0 60px rgba(0,255,255,0.35);
+  transform: translateY(-3px) scale(1.02);
 }
 
 .btn-secondary {
@@ -95,10 +140,13 @@ body {
 }
 .btn-secondary:hover {
   border-color: var(--cyan); color: var(--cyan);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
 }
 
-/* Terminal */
+/* ─── Terminal ───────────────────────────────────────────── */
+
+.terminal-wrapper { perspective: 800px; }
+
 .terminal-section {
   position: relative; z-index: 1;
   max-width: 700px; margin: 0 auto; padding: 0 24px 60px;
@@ -109,7 +157,12 @@ body {
   border-radius: var(--radius); overflow: hidden;
   font-size: 13px; line-height: 1.5;
   font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace;
-  box-shadow: 0 0 60px rgba(0,255,255,0.04);
+  box-shadow: 0 0 80px rgba(0,255,255,0.04), 0 20px 60px rgba(0,0,0,0.4);
+  transition: box-shadow 0.3s ease;
+}
+
+.terminal:hover {
+  box-shadow: 0 0 100px rgba(0,255,255,0.08), 0 20px 60px rgba(0,0,0,0.4);
 }
 
 .terminal-header {
@@ -118,10 +171,12 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-.dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot { width: 10px; height: 10px; border-radius: 50%; transition: opacity 0.2s; }
 .dot:nth-child(1) { background: #ff5f57; }
 .dot:nth-child(2) { background: #ffbd2e; }
 .dot:nth-child(3) { background: #28c840; }
+.terminal:hover .dot { opacity: 0.8; }
+
 .terminal-title { color: var(--dim); font-size: 11px; margin-left: 8px; }
 
 .terminal-body { padding: 16px; overflow-x: auto; white-space: pre; min-height: 320px; }
@@ -133,28 +188,41 @@ body {
 .terminal-body .amber { color: var(--amber); }
 .cursor { animation: blink 1s step-end infinite; color: var(--cyan); }
 
-/* Live Charts */
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ─── Live Charts ────────────────────────────────────────── */
+
 .live-section {
   position: relative; z-index: 1;
   max-width: 700px; margin: 0 auto; padding: 0 24px 60px;
 }
 
 .live-panel {
-  display: flex; gap: 32px; justify-content: center;
+  display: flex; gap: 40px; justify-content: center;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 24px;
+  border-radius: var(--radius); padding: 28px 36px;
+  box-shadow: 0 0 40px rgba(0,0,0,0.3);
 }
 
 .live-chart {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  position: relative;
 }
 
-.live-chart svg { filter: drop-shadow(0 0 8px rgba(0,255,255,0.15)); }
+.live-chart svg {
+  filter: drop-shadow(0 0 12px rgba(0,255,255,0.15));
+  transition: filter 0.3s;
+}
+
+.live-chart:hover svg {
+  filter: drop-shadow(0 0 24px rgba(0,255,255,0.3));
+}
 
 .chart-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-.chart-value { font-size: 13px; font-weight: 700; color: #fff; }
+.chart-value { font-size: 14px; font-weight: 700; color: #fff; }
 
-/* Features */
+/* ─── Features ───────────────────────────────────────────── */
+
 .features-section {
   position: relative; z-index: 1;
   max-width: 800px; margin: 0 auto; padding: 0 24px 60px;
@@ -162,7 +230,7 @@ body {
 
 .section-title {
   text-align: center; font-size: 24px; font-weight: 600;
-  color: #fff; margin-bottom: 32px;
+  color: #fff; margin-bottom: 36px;
 }
 
 .features-grid {
@@ -174,20 +242,22 @@ body {
 .card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 24px;
-  transition: all 0.3s ease;
+  transition: all 0.35s cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform;
 }
 
 .card:hover {
   border-color: var(--cyan);
-  transform: translateY(-4px);
-  box-shadow: 0 8px 30px rgba(0,255,255,0.06);
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 12px 40px rgba(0,255,255,0.08);
 }
 
 .card-icon { font-size: 24px; margin-bottom: 12px; display: block; }
 .card h3 { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 8px; }
 .card p { font-size: 13px; color: var(--dim); line-height: 1.5; }
 
-/* Install */
+/* ─── Install ────────────────────────────────────────────── */
+
 .install-section {
   position: relative; z-index: 1;
   max-width: 600px; margin: 0 auto; padding: 0 24px 60px;
@@ -195,7 +265,8 @@ body {
 
 .install-box {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 40px; text-align: center;
+  border-radius: var(--radius); padding: 44px; text-align: center;
+  box-shadow: 0 0 40px rgba(0,0,0,0.3);
 }
 
 .install-box h2 { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 24px; }
@@ -205,6 +276,11 @@ body {
   border-radius: 8px; padding: 16px;
   font-family: 'SF Mono', 'Cascadia Code', monospace;
   font-size: 13px; color: var(--green); overflow-x: auto; text-align: left;
+  transition: box-shadow 0.3s;
+}
+
+.code-block:hover {
+  box-shadow: 0 0 30px rgba(0,255,136,0.06);
 }
 
 .code-block .comment { color: var(--dim); }
@@ -213,7 +289,8 @@ body {
 .install-note { margin-top: 16px; font-size: 13px; color: var(--dim); }
 .install-note code { color: var(--cyan); font-family: 'SF Mono', monospace; font-size: 12px; }
 
-/* Commands */
+/* ─── Commands ───────────────────────────────────────────── */
+
 .commands-section {
   position: relative; z-index: 1;
   max-width: 700px; margin: 0 auto; padding: 0 24px 60px;
@@ -225,33 +302,37 @@ body {
   font-weight: 500; border-bottom: 1px solid var(--border);
   font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
 }
-.cmd-table td { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.cmd-table td { padding: 10px 16px; border-bottom: 1px solid var(--border); transition: background 0.2s; }
 .cmd-table code { font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: 12px; color: var(--cyan); }
 .cmd-table tr:hover td { background: var(--surface); }
 
-/* Footer */
+/* ─── Footer ─────────────────────────────────────────────── */
+
 .footer {
   position: relative; z-index: 1;
   text-align: center; padding: 40px 24px 60px;
   border-top: 1px solid var(--border); font-size: 13px; color: var(--dim);
 }
 .footer p { margin-bottom: 4px; }
-a { color: var(--cyan); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a { color: var(--cyan); text-decoration: none; transition: opacity 0.2s; }
+a:hover { text-decoration: underline; opacity: 0.8; }
 
-/* Scroll Reveal */
-.reveal { opacity: 0; transform: translateY(24px); transition: all 0.6s ease; }
+/* ─── Scroll Reveal ──────────────────────────────────────── */
+
+.reveal { opacity: 0; transform: translateY(30px); transition: all 0.7s cubic-bezier(0.2, 0, 0, 1); }
 .reveal.revealed { opacity: 1; transform: translateY(0); }
 
-/* Animations */
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes blink { 50% { opacity: 0; } }
+/* ─── Animations ─────────────────────────────────────────── */
 
-/* Mobile */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ─── Mobile ─────────────────────────────────────────────── */
+
 @media (max-width: 600px) {
   .hero { padding: 80px 16px 40px; }
   .terminal-body { font-size: 11px; min-height: 240px; }
   .install-box { padding: 24px; }
   .live-panel { flex-direction: column; align-items: center; }
+  .floaters { display: none; }
 }
