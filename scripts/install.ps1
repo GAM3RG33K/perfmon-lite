@@ -1,6 +1,6 @@
 # perfmon — install.ps1
 # Downloads the latest release binary for Windows and installs it.
-# Usage: iwr https://perfmon.qzz.io/windows -useb | iex
+# Usage: iwr https://get.perfmon.qzz.io/windows -useb | iex
 #   or:  .\scripts\install.ps1
 
 param(

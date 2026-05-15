@@ -66,12 +66,12 @@ perfmon --mock --export html --output ./report
 
 **macOS / Linux:**
 ```bash
-curl -sfL https://perfmon.qzz.io | bash
+curl -sfL https://get.perfmon.qzz.io | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-iwr https://perfmon.qzz.io/windows -useb | iex
+iwr https://get.perfmon.qzz.io/windows -useb | iex
 ```
 
 > On macOS you may need to add `~/.local/bin` to your PATH.
@@ -81,12 +81,12 @@ iwr https://perfmon.qzz.io/windows -useb | iex
 
 **macOS / Linux:**
 ```bash
-curl -sfL https://perfmon.qzz.io/update | bash
+curl -sfL https://get.perfmon.qzz.io/update | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-iwr https://perfmon.qzz.io/update/windows -useb | iex
+iwr https://get.perfmon.qzz.io/update/windows -useb | iex
 ```
 
 Or use the built-in update subcommand:
@@ -99,12 +99,12 @@ perfmon update
 
 **macOS / Linux:**
 ```bash
-curl -sfL https://perfmon.qzz.io/uninstall | bash
+curl -sfL https://get.perfmon.qzz.io/uninstall | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-iwr https://perfmon.qzz.io/uninstall/windows -useb | iex
+iwr https://get.perfmon.qzz.io/uninstall/windows -useb | iex
 ```
 
 ### Manual download

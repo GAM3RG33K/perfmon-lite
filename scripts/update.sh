@@ -3,7 +3,7 @@
 # Checks the currently installed version against the latest GitHub release
 # and upgrades if a newer version is available.
 # Usage: ./scripts/update.sh
-#   or:  curl -sfL https://perfmon.qzz.io/update | bash
+#   or:  curl -sfL https://get.perfmon.qzz.io/update | bash
 
 set -euo pipefail
 
