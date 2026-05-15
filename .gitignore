@@ -39,3 +39,5 @@ release/
 # Local debugging artifacts
 .local/
 coverage.out
+.wrangler/
+wrangler.jsonc

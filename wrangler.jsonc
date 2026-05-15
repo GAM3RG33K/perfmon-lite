@@ -1,5 +1,0 @@
-{
-  "name": "perfmon-install",
-  "compatibility_date": "2026-05-15",
-  "main": "scripts/worker.js"
-}
