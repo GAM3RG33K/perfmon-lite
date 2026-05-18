@@ -602,7 +602,7 @@ func runUpdate(verbose bool) {
 	var assetName string
 	switch {
 	case goos == "darwin":
-		assetName = fmt.Sprintf("perfmon-tool-%s-darwin-universal", latestVer)
+		assetName = fmt.Sprintf("perfmon-tool-%s-darwin-%s", latestVer, goarch)
 	case goos == "windows":
 		assetName = fmt.Sprintf("perfmon-tool-%s-windows-%s.exe", latestVer, goarch)
 	default:

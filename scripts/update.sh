@@ -80,7 +80,7 @@ esac
 # ── Download and replace ───────────────────────────────────────────────
 VER="${LATEST_STR}"
 if [ "$GOOS" = "darwin" ]; then
-  ASSET="perfmon-tool-${VER}-darwin-universal"
+  ASSET="perfmon-tool-${VER}-darwin-${GOARCH}"
 elif [ "$GOOS" = "windows" ]; then
   ASSET="perfmon-tool-${VER}-windows-${GOARCH}.exe"
 else

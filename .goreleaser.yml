@@ -25,7 +25,7 @@ builds:
         - cmd: "./.goreleaser/post-build.sh {{ .Path }} {{ .Name }}"
           output: true
 
-  - id: perfmon-darwin-amd64
+  - id: perfmon-darwin
     main: ./cmd/perfmon/
     binary: perfmon-tool
     ldflags:
@@ -36,21 +36,6 @@ builds:
       - darwin
     goarch:
       - amd64
-    hooks:
-      post:
-        - cmd: "./.goreleaser/post-build.sh {{ .Path }} {{ .Name }}"
-          output: true
-
-  - id: perfmon-darwin-arm64
-    main: ./cmd/perfmon/
-    binary: perfmon-tool
-    ldflags:
-      - -s -w -X main.version={{ .Version }}
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - darwin
-    goarch:
       - arm64
     hooks:
       post:
@@ -74,22 +59,15 @@ builds:
         - cmd: "./.goreleaser/post-build.sh {{ .Path }} {{ .Name }}"
           output: true
 
-universal_binary:
-  - id: perfmon-darwin-universal
-    ids:
-      - perfmon-darwin-amd64
-      - perfmon-darwin-arm64
-    name_template: "perfmon-tool-{{ .Version }}-darwin-universal"
-
 archives:
   - id: linux-binaries
     builds: [perfmon-linux]
     name_template: "perfmon-tool-{{ .Version }}-linux-{{ .Arch }}"
     formats: ["binary"]
 
-  - id: darwin-universal
-    builds: [perfmon-darwin-universal]
-    name_template: "perfmon-tool-{{ .Version }}-darwin-universal"
+  - id: darwin-binaries
+    builds: [perfmon-darwin]
+    name_template: "perfmon-tool-{{ .Version }}-darwin-{{ .Arch }}"
     formats: ["binary"]
 
   - id: windows-binaries

@@ -20,7 +20,8 @@ Download the latest binary for your platform from the [releases page](https://gi
 
 | Platform | Download |
 |----------|----------|
-| macOS (Intel & Apple Silicon) | `perfmon-tool-<version>-darwin-universal` |
+| macOS (Intel) | `perfmon-tool-<version>-darwin-amd64` |
+| macOS (Apple Silicon) | `perfmon-tool-<version>-darwin-arm64` |
 | Linux (x86_64) | `perfmon-tool-<version>-linux-amd64` |
 | Linux (ARM64) | `perfmon-tool-<version>-linux-arm64` |
 | Windows (x86_64) | `perfmon-tool-<version>-windows-amd64.exe` |

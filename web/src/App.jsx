@@ -314,7 +314,8 @@ export default function App() {
             <table className="dl-table">
               <thead><tr><th>Platform</th><th>File</th></tr></thead>
               <tbody>
-                <tr><td>macOS (Intel & Apple Silicon)</td><td><code>perfmon-tool-{import.meta.env.VITE_APP_VERSION || 'dev'}-darwin-universal</code></td></tr>
+                <tr><td>macOS (Intel)</td><td><code>perfmon-tool-{import.meta.env.VITE_APP_VERSION || 'dev'}-darwin-amd64</code></td></tr>
+                <tr><td>macOS (Apple Silicon)</td><td><code>perfmon-tool-{import.meta.env.VITE_APP_VERSION || 'dev'}-darwin-arm64</code></td></tr>
                 <tr><td>Linux (x86_64)</td><td><code>perfmon-tool-{import.meta.env.VITE_APP_VERSION || 'dev'}-linux-amd64</code></td></tr>
                 <tr><td>Linux (ARM64)</td><td><code>perfmon-tool-{import.meta.env.VITE_APP_VERSION || 'dev'}-linux-arm64</code></td></tr>
                 <tr><td>Windows (x86_64)</td><td><code>perfmon-tool-{import.meta.env.VITE_APP_VERSION || 'dev'}-windows-amd64.exe</code></td></tr>
