@@ -2,9 +2,11 @@
 
 **Blistering-fast, terminal-based mobile app profiling** — CPU, memory, and thread telemetry for Android and iOS, right in your terminal.
 
+> **v0.0.1 Beta** — First public release. Core profiling features stable. Feedback welcome!
+
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│ perfmon v0.0.1                   Device: Pixel 8  Uptime: 12:34 │
+│ perfmon-tool v0.0.1              Device: Pixel 8  Uptime: 12:34 │
 ├─────────────────────────────────────────────────────────────┤
 │ [Dashboard]  [Processes]  [System Logs]              (q) quit │
 ├─────────────────────────────────────────────────────────────┤

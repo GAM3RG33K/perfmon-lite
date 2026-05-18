@@ -89,7 +89,7 @@ perfmon-tool --id in.thetatva.tatva
 When run without flags, perfmon opens an interactive terminal UI:
 
 ```
-┌─ perfmon v0.0.1 ──────────────────────────────────────┐
+┌─ perfmon-tool v0.0.1 ──────────────────────────────────┐
 │  Target: Pixel 8  │  App: com.example.app  [DEBUG]    │
 ├───────────────────────────────────────────────────────┤
 │  CPU Utilization (%)                                   │
