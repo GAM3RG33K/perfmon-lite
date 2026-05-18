@@ -86,7 +86,7 @@ function useLiveMetrics(deviceName) {
         }
       })
     }
-    const t = setInterval(tick, 3000)
+    const t = setInterval(tick, 1000)
     tick()
     return () => clearInterval(t)
   }, [])
