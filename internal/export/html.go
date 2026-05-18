@@ -205,6 +205,17 @@ const htmlTemplate = `<!DOCTYPE html>
     </table>
   </div>
 
+  <!-- Captured App Logs -->
+  <div class="section-title">Captured App Logs</div>
+  {{- if .Logs }}
+  <div class="stack-section">
+    <pre class="stack-pre">{{ range .Logs }}{{ . }}
+{{- end }}</pre>
+  </div>
+  {{- else }}
+  <p class="chart-labels">No app logs were captured during this session.</p>
+  {{- end }}
+
   <!-- Stack Traces -->
   {{- $hasStack := false }}{{ range .Telemetry }}{{ if .Stack }}{{ $hasStack = true }}{{ end }}{{ end }}
   {{- if $hasStack }}

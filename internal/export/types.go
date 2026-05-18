@@ -27,14 +27,16 @@ type Options struct {
 	DeviceName  string
 	AppName     string
 	BuildType   engine.BuildType
+	Logs        []string // captured app logs (logcat/log stream)
 }
 
 // ExportData bundles all data needed to render an export file.
 type ExportData struct {
-	Schema    string               `json:"$schema"`
-	Metadata  ExportMetadata       `json:"metadata"`
-	Summary   engine.MetricsSummary `json:"metrics_summary"`
+	Schema    string                    `json:"$schema"`
+	Metadata  ExportMetadata            `json:"metadata"`
+	Summary   engine.MetricsSummary     `json:"metrics_summary"`
 	Telemetry []engine.TelemetrySnapshot `json:"telemetry"`
+	Logs      []string                  `json:"logs,omitempty"` // captured app logs
 }
 
 // ExportMetadata describes the session and target.
@@ -53,6 +55,10 @@ func BuildExportData(snapshots []engine.TelemetrySnapshot, opts Options) ExportD
 	if telemetry == nil {
 		telemetry = []engine.TelemetrySnapshot{}
 	}
+	logs := opts.Logs
+	if logs == nil {
+		logs = []string{}
+	}
 	return ExportData{
 		Schema: fmt.Sprintf("https://perfmon.qzz.io/schemas/export-v1.json"),
 		Metadata: ExportMetadata{
@@ -65,6 +71,7 @@ func BuildExportData(snapshots []engine.TelemetrySnapshot, opts Options) ExportD
 		},
 		Summary:   engine.ComputeMetricsSummary(snapshots),
 		Telemetry: telemetry,
+		Logs:      logs,
 	}
 }
 

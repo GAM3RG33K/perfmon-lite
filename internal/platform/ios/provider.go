@@ -3,6 +3,7 @@ package ios
 import (
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -84,8 +85,51 @@ func (p *iOSProvider) Close() error {
 	return nil
 }
 
-// Interface compliance checks.
+// ─── Log capture (simulator log stream) ────────────────────────────────────
+
+// CaptureLogs fetches recent log entries from the iOS simulator for the given bundle.
+func (p *iOSProvider) CaptureLogs(pid int32) ([]string, error) {
+	p.mu.Lock()
+	deviceID := p.DeviceID
+	p.mu.Unlock()
+
+	if deviceID == "" {
+		return nil, fmt.Errorf("no device ID set")
+	}
+
+	// Get the device info to check if it's a simulator
+	device, err := p.getDevice(deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("device lookup: %w", err)
+	}
+	if device.IsPhysical {
+		return nil, fmt.Errorf("log capture not supported on physical iOS devices")
+	}
+
+	// Use log stream --last to get recent logs, then grep for the PID
+	out, err := p.simctlSpawn(deviceID, "log", "stream", "--last", "2m", "--style", "compact")
+	if err != nil {
+		return nil, fmt.Errorf("log stream: %w", err)
+	}
+
+	// Filter for lines containing our PID
+	lines := strings.Split(out, "\n")
+	var filtered []string
+	pidStr := strconv.FormatInt(int64(pid), 10)
+	for _, line := range lines {
+		if strings.Contains(line, pidStr) {
+			filtered = append(filtered, line)
+		}
+	}
+	if len(filtered) > 20 {
+		filtered = filtered[len(filtered)-20:]
+	}
+	return filtered, nil
+}
+
+// ─── Interface compliance checks ────────────────────────────────────────────
 var _ engine.PlatformProvider = (*iOSProvider)(nil)
+var _ engine.LogCapturer = (*iOSProvider)(nil)
 var _ engine.DeviceDiscovery = (*iOSProvider)(nil)
 var _ engine.ProcessMapper = (*iOSProvider)(nil)
 var _ engine.TelemetryProvider = (*iOSProvider)(nil)

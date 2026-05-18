@@ -69,10 +69,35 @@ func (m *Model) Init() tea.Cmd {
 	if m.Mock {
 		m.Logs.AddEntry("INFO", "Mock mode enabled — generating simulated telemetry")
 	}
-	return m.Engine.Start()
+	return tea.Batch(
+		m.Engine.Start(),
+		logCaptureCmd(m.Engine),
+	)
 }
 
 type ClearStatusMsg struct{}
+
+type LogCaptureMsg struct {
+	Lines []string
+}
+
+func logCaptureCmd(eng *engine.Engine) tea.Cmd {
+	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+		if eng == nil || eng.Provider == nil {
+			return nil
+		}
+		lc, ok := eng.Provider.(engine.LogCapturer)
+		if !ok {
+			return nil
+		}
+		pid := eng.PID
+		lines, err := lc.CaptureLogs(pid)
+		if err != nil || len(lines) == 0 {
+			return nil
+		}
+		return LogCaptureMsg{Lines: lines}
+	})
+}
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -94,6 +119,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case engine.TelemetryMsg:
 		return m.handleTelemetry(msg)
+
+	case LogCaptureMsg:
+		for _, line := range msg.Lines {
+			m.Logs.AddEntry("APP", line)
+		}
+		return m, logCaptureCmd(m.Engine)
 
 	case ClearStatusMsg:
 		m.statusMsg = ""
@@ -488,6 +519,10 @@ func (m *Model) exportCurrentData(formatType export.Format) (string, error) {
 		appName = app.PackageName
 		buildType = app.BuildType
 	}
+	var logLines []string
+	for _, e := range m.Logs.Entries {
+		logLines = append(logLines, fmt.Sprintf("[%s] %s", e.Level, e.Message))
+	}
 	opts := export.Options{
 		Format:     formatType,
 		OutputPath: "",
@@ -496,6 +531,7 @@ func (m *Model) exportCurrentData(formatType export.Format) (string, error) {
 		DeviceName: deviceName,
 		AppName:    appName,
 		BuildType:  buildType,
+		Logs:       logLines,
 	}
 	opts.OutputPath = export.ResolveOutputPath(opts, snapshots)
 	if err := export.EnsureOutputDir(opts.OutputPath); err != nil {

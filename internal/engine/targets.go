@@ -24,6 +24,13 @@ type TelemetryProvider interface {
 	Close() error
 }
 
+// LogCapturer is implemented by platform providers that can capture
+// app-specific console/logcat logs during profiling.
+type LogCapturer interface {
+	// CaptureLogs fetches new log entries for the given PID since the last call.
+	CaptureLogs(pid int32) ([]string, error)
+}
+
 // PlatformProvider combines all platform-specific interfaces.
 type PlatformProvider interface {
 	DeviceDiscovery

@@ -300,8 +300,47 @@ func (e *AdbError) Unwrap() error {
 	return e.Err
 }
 
-// Interface compliance checks.
+// ─── Log capture (logcat) ─────────────────────────────────────────────────
+
+// CaptureLogs fetches recent logcat entries for the current device.
+// Returns new log lines since the last call (tracked by logcatCursor).
+func (p *ADBProvider) CaptureLogs(pid int32) ([]string, error) {
+	p.mu.Lock()
+	deviceID := p.DeviceID
+	p.mu.Unlock()
+
+	if deviceID == "" {
+		return nil, fmt.Errorf("no device ID set")
+	}
+
+	// Capture last 10 lines of logcat for this PID, clear buffer after
+	cmd := fmt.Sprintf("logcat -d --pid=%d -t 10 2>/dev/null", pid)
+
+	var rawOutput string
+	var err error
+
+	err = p.ensureShell()
+	if err == nil {
+		rawOutput, err = p.execInShell(cmd)
+	}
+	if err != nil {
+		rawOutput, err = p.adbExec("-s", deviceID, "shell", cmd)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	lines := strings.Split(strings.TrimSpace(rawOutput), "\n")
+	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
+		return nil, nil
+	}
+
+	return lines, nil
+}
+
+// ─── Interface compliance checks ──────────────────────────────────────────
 var _ engine.PlatformProvider = (*ADBProvider)(nil)
+var _ engine.LogCapturer = (*ADBProvider)(nil)
 var _ engine.DeviceDiscovery = (*ADBProvider)(nil)
 var _ engine.ProcessMapper = (*ADBProvider)(nil)
 var _ engine.TelemetryProvider = (*ADBProvider)(nil)

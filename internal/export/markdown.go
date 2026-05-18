@@ -61,6 +61,20 @@ const markdownTemplate = `# perfmon Telemetry Report
 | {{ add $i 1 }} | {{ formatUnix $s.Timestamp }} | {{ printf "%.1f" $s.CPUPercent }} | {{ $s.MemoryKB }} | {{ $s.Threads }} | {{ if $s.Stack }}Yes{{ else }}-{{ end }} |
 {{- end }}
 
+---
+
+## Captured App Logs
+
+{{- if .Logs }}
+` + "```" + `
+{{- range .Logs }}
+{{ . }}
+{{- end }}
+` + "```" + `
+{{- else }}
+*No app logs were captured during this session.*
+{{- end }}
+
 ### Stack Traces
 
 Samples with significant CPU usage (>50%) include kernel or user-space stack traces:
