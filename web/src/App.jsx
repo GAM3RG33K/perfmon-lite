@@ -160,10 +160,9 @@ function CopyButton({ text }) {
 
 /* ─── Terminal with live metrics ────────────────────────── */
 
-function Bar({ pct, color }) {
+function barStr(pct) {
   const w = Math.max(Math.round(pct / 100 * 44), 1)
-  const bar = '█'.repeat(w) + '─'.repeat(Math.max(44 - w, 0))
-  return <span style={{ color }}>{bar}</span>
+  return '█'.repeat(w) + '─'.repeat(Math.max(44 - w, 0))
 }
 
 function LiveTerminal({ mouse }) {
@@ -183,13 +182,13 @@ function LiveTerminal({ mouse }) {
     `├─────────────────────────────────────────────────────────────────────┤`,
     `│ CPU Utilization (overall)  ${m.cpuLoad}%`,
     `│ ┌─────────────────────────────────────────────────────────────────┐ │`,
-    `│ │ ${Bar({ pct: m.cpuLoad, color: '#0ff' })} ${String(m.cpuLoad).padStart(3)}% │ │`,
+    `│ │ ${barStr(m.cpuLoad)} ${String(m.cpuLoad).padStart(3)}% │ │`,
     `│ └─────────────────────────────────────────────────────────────────┘ │`,
     `│`,
     `│ Memory (Total: ${m.memTotal} GB)  ${m.memUsed.toFixed(1)} GB used`,
     `│ ┌─────────────────────────────────────────────────────────────────┐ │`,
-    `│ │ Used:  ${Bar({ pct: memPct, color: '#f0f' })} ${String(memPct).padStart(3)}% │ │`,
-    `│ │ Cache: ${Bar({ pct: cachePct, color: '#0f8' })} ${String(cachePct).padStart(3)}% │ │`,
+    `│ │ Used:  ${barStr(memPct)} ${String(memPct).padStart(3)}% │ │`,
+    `│ │ Cache: ${barStr(cachePct)} ${String(cachePct).padStart(3)}% │ │`,
     `│ └─────────────────────────────────────────────────────────────────┘ │`,
     `│`,
     `│ Threads: ${m.threads}  │  Peak CPU: ${m.cpuLoad + 12}%  │  Peak RAM: ${(m.memUsed + 0.5).toFixed(1)} GB  │  Samples: 300`,
