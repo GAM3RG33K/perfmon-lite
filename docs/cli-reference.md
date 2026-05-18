@@ -9,10 +9,12 @@
 ## 1. Synopsis
 
 ```
-perfmon [flags] [command]
+perfmon-tool [flags] [command]
 ```
 
 A blistering-fast, standalone, terminal-based mobile app profiler that provides real-time CPU, memory, and thread telemetry for Android and iOS apps without requiring heavy IDEs.
+
+> The binary is named `perfmon-tool` on all platforms to avoid conflicts with Windows' built-in Performance Monitor (`perfmon.exe`).
 
 ---
 
@@ -20,10 +22,10 @@ A blistering-fast, standalone, terminal-based mobile app profiler that provides 
 
 | Command | Description |
 |---------|-------------|
-| `perfmon [flags]` | Launch interactive TUI (auto-detect platform) |
-| `perfmon devices [flags]` | List connected devices and simulators |
-| `perfmon uninstall` | Remove perfmon binary from system |
-| `perfmon update` | Check for newer version on GitHub and upgrade |
+| `perfmon-tool [flags]` | Launch interactive TUI (auto-detect platform) |
+| `perfmon-tool devices [flags]` | List connected devices and simulators |
+| `perfmon-tool uninstall` | Remove perfmon binary from system |
+| `perfmon-tool update` | Check for newer version on GitHub and upgrade |
 
 ## 3. Global Flags
 
@@ -177,15 +179,15 @@ When running `perfmon` without a command (or with `--mock`), the interactive TUI
 ### 5.1 Launch interactive TUI with mock data
 
 ```bash
-perfmon --mock
+perfmon-tool --mock
 ```
 
-Starts the TUI dashboard with simulated sinusoidal CPU/memory/thread telemetry. Ideal for UI development and testing.
+Starts the TUI dashboard with simulated telemetry. Ideal for UI development and testing.
 
 ### 5.2 Launch interactive TUI targeting a specific device
 
 ```bash
-perfmon --device emulator-5554
+perfmon-tool --device emulator-5554
 ```
 
 Skips the device selection screen and immediately connects to the specified device.
@@ -193,7 +195,7 @@ Skips the device selection screen and immediately connects to the specified devi
 ### 5.3 Launch with custom polling interval
 
 ```bash
-perfmon --mock --interval 2
+perfmon-tool --mock --interval 2
 ```
 
 Samples telemetry every 2 seconds (default: 1s).
@@ -201,20 +203,20 @@ Samples telemetry every 2 seconds (default: 1s).
 ### 5.4 Export telemetry to JSON
 
 ```bash
-perfmon export json --output ./data/metrics
+perfmon-tool --mock --export json --output ./data/metrics
 # -> ./data/metrics.json
 ```
 
 ### 5.5 List all available devices
 
 ```bash
-perfmon devices
+perfmon-tool devices
 ```
 
 ### 5.6 List only Android devices as JSON
 
 ```bash
-perfmon devices --platform android --json
+perfmon-tool devices --platform android --json
 ```
 
 ---
@@ -245,13 +247,15 @@ perfmon devices --platform android --json
 ## 8. Complete Command Tree
 
 ```
-perfmon [--mock] [--device <id>] [--id <app>] [--interval <n>]
-       [--buffer <n>] [--output <path>] [--verbose]
-       [--help | -h] [--version | -v]
+perfmon-tool [--mock] [--device <id>] [--id <app>] [--interval <n>]
+            [--buffer <n>] [--output <path>] [--verbose]
+            [--help | -h] [--version | -v]
 
-perfmon devices [--json] [--platform <p>] [--build-info]
+perfmon-tool devices [--json] [--platform <p>] [--build-info]
 
-perfmon uninstall
+perfmon-tool uninstall
+
+perfmon-tool update
 ```
 
 ---
@@ -261,33 +265,31 @@ perfmon uninstall
 ### Quick check — mock mode
 
 ```bash
-perfmon --mock
-# → See live animated telemetry immediately
+perfmon-tool --mock
 ```
 
 ### Profile a specific app
 
 ```bash
 # Step 1: List connected devices
-perfmon devices
+perfmon-tool devices
 
 # Step 2: Connect and profile by device
-perfmon --device emulator-5554
+perfmon-tool --device emulator-5554
 
 # Or target a specific app by package name
-perfmon --id in.thetatva.tatva
+perfmon-tool --id in.thetatva.tatva
 
 # Or combine device + app
-perfmon --device emulator-5554 --id in.thetatva.tatva
+perfmon-tool --device emulator-5554 --id in.thetatva.tatva
 
 # Step 3: Press 'e' to export during session
-# or use --export for non-interactive export:
-perfmon --id in.thetatva.tatva --export json
+perfmon-tool --id in.thetatva.tatva --export json
 ```
 
 ### Headless export for CI/CD
 
 ```bash
-perfmon devices --json | jq '.[] | select(.platform == "android") | .id'
-perfmon --device <device_id> --export json
+perfmon-tool devices --json | jq '.[] | select(.platform == "android") | .id'
+perfmon-tool --device <device_id> --export json
 ```

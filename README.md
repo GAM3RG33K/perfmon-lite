@@ -3,23 +3,26 @@
 **Blistering-fast, terminal-based mobile app profiling** — CPU, memory, and thread telemetry for Android and iOS, right in your terminal.
 
 ```text
-┌─ perfmon v1.0.0 ──────────────────────────────────────────────┐
-│  Target: Pixel 8 (Physical)  │  App: com.example.app [DEBUG]  │
-├───────────────────────────────────────────────────────────────┤
-│  CPU Utilization (%)                                          │
-│  78% ┤    ╭╮                                                  │
-│  30% ┤ ╭──╯╰─╮╭──╮                                            │
-│   0% └─╯     ╰╯  ╰──────────────────────────────────────────  │
-│                                                               │
-│  Memory Footprint (MB)                                        │
-│  210 ┤      ╭───────────────────────────────────────────────  │
-│  180 ┤   ╭──╯                                                 │
-│    0 └───╯                                                    │
-│                                                               │
-│  Active Threads: 42  │  Peak RAM: 215 MB  │  Status: Active   │
-├───────────────────────────────────────────────────────────────┤
-│  ↑/↓ Navigate  TAB Switch  e Export  q Quit                   │
-└───────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ perfmon v0.0.1                   Device: Pixel 8  Uptime: 12:34 │
+├─────────────────────────────────────────────────────────────┤
+│ [Dashboard]  [Processes]  [System Logs]              (q) quit │
+├─────────────────────────────────────────────────────────────┤
+│ App: com.example.app  [DEBUG]  │ CPU: 8 cores  │ Temp: 52°C │
+├─────────────────────────────────────────────────────────────┤
+│ CPU Utilization (overall)  78.2%                           │
+│ ┌───────────────────────────────────────────────────────┐ │
+│ │ ████████████████████████████████████████████────── 78% │ │
+│ └───────────────────────────────────────────────────────┘ │
+│ Memory (Total: 8.0 GB)  312 MB                            │
+│ ┌───────────────────────────────────────────────────────┐ │
+│ │ Used:  ████████████████████████████████──────  215 MB │ │
+│ │ Cache: ██████████████────────────────────────  97 MB  │ │
+│ └───────────────────────────────────────────────────────┘ │
+│ Threads: 42  │ Peak CPU: 78%  │ Peak RAM: 215 MB          │
+├─────────────────────────────────────────────────────────────┤
+│ [↑/↓] Navigate  [TAB] Switch  [e] Export  [?] Help  [q] Quit │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -28,16 +31,14 @@
 
 ```bash
 # Try it with mock data (no device needed)
-perfmon --mock
+perfmon-tool --mock
 
 # Profile a connected Android device
-perfmon
+perfmon-tool
 
-# Export 10 samples to HTML report
-perfmon --mock --export html --output ./report
+# Export telemetry to HTML report
+perfmon-tool --mock --export html --output ./report
 ```
-
-> **Windows users:** replace `perfmon` with `perfmon-tool` in all commands.
 
 ---
 
@@ -45,16 +46,16 @@ perfmon --mock --export html --output ./report
 
 | Feature | Android | iOS |
 |---------|---------|-----|
-| Device discovery | ✅ `adb devices -l` | ✅ `xcrun simctl list` + `devicectl` |
+| Device discovery | ✅ `adb devices -l` | ✅ `xcrun simctl list` |
 | Process mapping | ✅ `adb shell ps` | ✅ `launchctl list` |
 | CPU sampling | ✅ `/proc/<pid>/stat` (tick delta) | ✅ macOS `ps` (host-level) |
 | Memory sampling | ✅ `/proc/<pid>/status` (VmRSS) | ✅ macOS `ps` (RSS) |
-| Thread counting | ✅ `/proc/<pid>/status` (Threads) | ❌ (not available on iOS) |
-| Build type detection | ✅ `dumpsys package` (DEBUGGABLE) | ✅ `_CodeSignature` + entitlements |
-| Persistent shell pipe | ✅ Single `adb shell` connection | N/A (uses macOS host tools) |
+| Thread counting | ✅ `/proc/<pid>/status` | ❌ |
+| Build type detection | ✅ `dumpsys package` | ✅ entitlements |
+| Persistent shell pipe | ✅ Single `adb shell` connection | N/A (macOS host tools) |
 | **Export formats** | **All platforms** |
 | JSON export | ✅ Structured data (PRD schema v1) |
-| Markdown export | ✅ Report with ASCII sparklines + tables |
+| Markdown export | ✅ Report with ASCII tables + charts |
 | HTML export | ✅ Standalone page with SVG vector charts |
 | PDF export | ✅ Vector line graph report (go-pdf/fpdf) |
 
@@ -74,51 +75,49 @@ curl -sfL https://get.perfmon.qzz.io | bash
 iwr https://get.perfmon.qzz.io/windows -useb | iex
 ```
 
-> On macOS you may need to add `~/.local/bin` to your PATH.
-> On Windows, the installer adds `%LOCALAPPDATA%\perfmon` to your user PATH — restart your terminal.
+Installs as `perfmon-tool` on all platforms.
 
 ### One-liner update
 
-**macOS / Linux:**
 ```bash
+# Built-in subcommand
+perfmon-tool update
+
+# Or via curl
 curl -sfL https://get.perfmon.qzz.io/update | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-iwr https://get.perfmon.qzz.io/update/windows -useb | iex
-```
-
-Or use the built-in update subcommand:
-
-```bash
-perfmon update
 ```
 
 ### One-liner uninstall
 
-**macOS / Linux:**
 ```bash
+perfmon-tool uninstall
+# Or via curl
 curl -sfL https://get.perfmon.qzz.io/uninstall | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-iwr https://get.perfmon.qzz.io/uninstall/windows -useb | iex
 ```
 
 ### Manual download
 
-Download the latest binary from the [Releases page](https://github.com/GAM3RG33K/perfmon-lite/releases).
+Download from [GitHub Releases](https://github.com/GAM3RG33K/perfmon-lite/releases).
 
-| Platform | Binary |
-|----------|--------|
-| macOS (Intel) | `perfmon_darwin_amd64` |
-| macOS (Apple Silicon) | `perfmon_darwin_arm64` |
-| Linux (x86_64) | `perfmon_linux_amd64` |
-| Linux (ARM64) | `perfmon_linux_arm64` |
-| Windows (x86_64) | `perfmon-tool_windows_amd64.exe` |
-| Windows (ARM64) | `perfmon-tool_windows_arm64.exe` |
+| Platform | File |
+|----------|------|
+| macOS (Intel) | `perfmon-tool-<version>-darwin-amd64` |
+| macOS (Apple Silicon) | `perfmon-tool-<version>-darwin-arm64` |
+| Linux (x86_64) | `perfmon-tool-<version>-linux-amd64` |
+| Linux (ARM64) | `perfmon-tool-<version>-linux-arm64` |
+| Windows (x86_64) | `perfmon-tool-<version>-windows-amd64.exe` |
+| Windows (ARM64) | `perfmon-tool-<version>-windows-arm64.exe` |
+
+**Manual install (macOS/Linux):**
+```bash
+chmod +x perfmon-tool-* && sudo mv perfmon-tool-* /usr/local/bin/perfmon-tool
+```
+
+**Manual install (Windows):**
+```powershell
+mkdir $env:LOCALAPPDATA\perfmon -Force
+move .\perfmon-tool-*.exe $env:LOCALAPPDATA\perfmon\perfmon-tool.exe
+```
 
 ### Prerequisites
 
@@ -133,19 +132,19 @@ Download the latest binary from the [Releases page](https://github.com/GAM3RG33K
 
 ```bash
 # Auto-detect platform (Android → iOS on macOS)
-perfmon
+perfmon-tool
 
 # Target a specific device
-perfmon --device emulator-5554
+perfmon-tool --device emulator-5554
 
 # Target a specific app by package/bundle ID
-perfmon --id in.thetatva.tatva
+perfmon-tool --id in.thetatva.tatva
 
-# Force mock mode for development
-perfmon --mock
+# Mock mode for development
+perfmon-tool --mock
 
-# Custom polling interval (1-60 seconds) and buffer size
-perfmon --interval 2 --buffer 600
+# Custom polling interval and buffer size
+perfmon-tool --interval 2 --buffer 600
 ```
 
 ### TUI Keybindings
@@ -154,10 +153,10 @@ perfmon --interval 2 --buffer 600
 |-----|--------|
 | `↑` / `↓` | Navigate lists |
 | `←` / `→` | Switch tabs |
-| `Tab` | Cycle forward through tabs |
+| `Tab` / `Shift+Tab` | Cycle tabs |
 | `1`–`3` | Jump to tab by number |
 | `Enter` | Select highlighted item |
-| `e` | Open export format picker (↑↓ navigate, Enter confirm, Esc cancel) |
+| `e` | Open export format picker |
 | `Shift+E` | Export directly to Markdown |
 | `Ctrl+E` | Export directly to HTML |
 | `r` | Refresh device list |
@@ -167,33 +166,13 @@ perfmon --interval 2 --buffer 600
 ### Non-interactive Export
 
 ```bash
-# Export 10 samples to JSON
-perfmon --mock --export json
-
-# Export to Markdown with custom path
-perfmon --mock --export md --output ./reports/session-001
-
-# Export to HTML
-perfmon --mock --export html --output ./reports/perf-report
-
-# Target specific device and app for export
-perfmon --device emulator-5554 --id in.thetatva.tatva --export json
-
-# Default paths
-perfmon --mock --export json          # → ./perfmon_export.json
-perfmon --mock --export md            # → ./perfmon_export.md
-perfmon --mock --export html          # → ./perfmon_export.html
-perfmon --mock --export pdf           # → ./perfmon_export.pdf
+perfmon-tool --mock --export json
+perfmon-tool --mock --export md --output ./reports/session-001
+perfmon-tool --mock --export html --output ./reports/perf-report
+perfmon-tool --device emulator-5554 --id in.thetatva.tatva --export json
 ```
 
-### Export Formats
-
-| Format | Description |
-|--------|-------------|
-| **JSON** | Structured data with metadata, metrics summary, and telemetry array — ideal for programmatic analysis |
-| **Markdown** | Human-readable report with summary table, per-sample telemetry table, and ASCII sparkline charts |
-| **HTML** | Standalone dark-themed webpage with SVG vector line charts for CPU, Memory, and Threads — no internet needed |
-| **PDF** | Native PDF with multi-page vector line graphs — perfect for sharing |
+See the full [Usage Guide](USAGE.md) for detailed documentation.
 
 ---
 
@@ -201,47 +180,27 @@ perfmon --mock --export pdf           # → ./perfmon_export.pdf
 
 | Document | Description |
 |----------|-------------|
-| [Architecture](docs/architecture.md) | System topology, module breakdown, data flow, interfaces |
-| [CLI Reference](docs/cli-reference.md) | Full flag reference, commands, exit codes, environment variables |
+| [Usage Guide](USAGE.md) | Complete install, usage, and configuration reference |
+| [Architecture](docs/architecture.md) | System topology, module breakdown, data flow |
+| [CLI Reference](docs/cli-reference.md) | Full flag reference, commands, exit codes |
 | [Development Plan](docs/plan.md) | Phased implementation plan with task tracking |
 | [Checklist](docs/checklist.md) | Detailed progress checklist across all phases |
 | [Gap Analysis](docs/GAP_TO_FILL.md) | Known issues and pending improvements |
 | [PRD](PRD.md) | Full product requirements document |
-| [Domain Setup](docs/domain-setup.md) | Cloudflare + DNS configuration guide |
 
 ---
 
 ## Development
 
 ```bash
-# Build
-make build
-
-# Run with mock data
-make mock
-
-# Run tests
-make test               # Full suite with race detector
-make test-short         # Quick run (no race detector)
-
-# Run Android integration tests (requires emulator/device)
-make test-adb
-
-# Cross-compile for all platforms
-make cross-build
-
-# Create a release tag and push (triggers CI release build)
-make cut-release
-
-# Re-tag to trigger a new CI release build (deletes existing tag)
-make retag
-
-# Install/update from latest GitHub release
-make install             # macOS/Linux only
-make update              # macOS/Linux only
-
-# Clean build artifacts
-make clean
+make build          # Build the binary
+make mock           # Run with mock data
+make test           # Full test suite with race detector
+make test-adb       # Android integration tests
+make cross-build    # Cross-compile for all platforms
+make cut-release    # Create and push a release tag
+make retag          # Re-trigger CI build (deletes existing tag)
+make clean          # Clean build artifacts
 ```
 
 ### Project Structure
@@ -256,6 +215,8 @@ internal/
 │   ├── android/             # ADB-based provider (discovery, process, telemetry)
 │   └── ios/                 # xcrun-based provider (simctl, devicectl)
 └── export/                  # Export subsystem (JSON, MD, HTML, PDF)
+web/                         # React landing page (GitHub Pages)
+scripts/                     # Install/update/uninstall scripts
 ```
 
 ### Test Stats
