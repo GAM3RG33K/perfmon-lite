@@ -59,32 +59,28 @@ function useDeviceInfo() {
 /* ─── Live metrics hook ────────────────────────────────── */
 
 function useLiveMetrics(deviceName) {
+  const totalMem = navigator.deviceMemory || 8
   const [metrics, setMetrics] = useState(() => ({
     device: deviceName,
     cpuCores: navigator.hardwareConcurrency || 4,
     cpuLoad: 34,
-    memUsed: 3.2,
-    memTotal: (performance.memory ? performance.memory.jsHeapSizeLimit / (1024*1024*1024) : 8).toFixed(1),
+    memUsed: (totalMem * 0.4).toFixed(1),
+    memTotal: totalMem.toString(),
     threads: 42,
     uptime: '0:00',
   }))
 
   useEffect(() => {
+    const total = parseFloat(totalMem.toString())
     const tick = () => {
       const load = Math.floor(Math.random() * 40 + 15)
-      const mem = performance.memory
-        ? (performance.memory.usedJSHeapSize / (1024*1024*1024)).toFixed(1)
-        : (2 + Math.random() * 3).toFixed(1)
-      setMetrics(prev => {
-        const totalMin = parseFloat(prev.memTotal) * 0.3
-        const memVal = Math.max(totalMin, parseFloat(mem) || 0)
-        return {
-          ...prev,
-          cpuLoad: load,
-          memUsed: parseFloat(memVal.toFixed(1)),
-          threads: Math.floor(35 + Math.random() * 20),
-        }
-      })
+      const mem = parseFloat((total * (0.25 + Math.random() * 0.45)).toFixed(1))
+      setMetrics(prev => ({
+        ...prev,
+        cpuLoad: load,
+        memUsed: mem,
+        threads: Math.floor(35 + Math.random() * 20),
+      }))
     }
     const t = setInterval(tick, 1000)
     tick()
