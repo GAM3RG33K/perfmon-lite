@@ -78,7 +78,14 @@ case "$ARCH" in
 esac
 
 # ── Download and replace ───────────────────────────────────────────────
-ASSET="perfmon_${LATEST_STR}_${GOOS}_${GOARCH}"
+VER="${LATEST_STR}"
+if [ "$GOOS" = "darwin" ]; then
+  ASSET="perfmon-tool-${VER}-darwin-universal"
+elif [ "$GOOS" = "windows" ]; then
+  ASSET="perfmon-tool-${VER}-windows-${GOARCH}.exe"
+else
+  ASSET="perfmon-tool-${VER}-linux-${GOARCH}"
+fi
 URL="https://github.com/${REPO}/releases/download/${LATEST}/${ASSET}"
 
 TMPDIR=$(mktemp -d)

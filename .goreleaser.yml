@@ -8,16 +8,63 @@ before:
     - go mod tidy
 
 builds:
-  - id: perfmon
+  - id: perfmon-linux
     main: ./cmd/perfmon/
-    binary: perfmon
+    binary: perfmon-tool
     ldflags:
       - -s -w -X main.version={{ .Version }}
     env:
       - CGO_ENABLED=0
     goos:
       - linux
+    goarch:
+      - amd64
+      - arm64
+    hooks:
+      post:
+        - cmd: "./.goreleaser/post-build.sh {{ .Path }} {{ .Name }}"
+          output: true
+
+  - id: perfmon-darwin-amd64
+    main: ./cmd/perfmon/
+    binary: perfmon-tool
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    env:
+      - CGO_ENABLED=0
+    goos:
       - darwin
+    goarch:
+      - amd64
+    hooks:
+      post:
+        - cmd: "./.goreleaser/post-build.sh {{ .Path }} {{ .Name }}"
+          output: true
+
+  - id: perfmon-darwin-arm64
+    main: ./cmd/perfmon/
+    binary: perfmon-tool
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    hooks:
+      post:
+        - cmd: "./.goreleaser/post-build.sh {{ .Path }} {{ .Name }}"
+          output: true
+
+  - id: perfmon-windows
+    main: ./cmd/perfmon/
+    binary: perfmon-tool
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    env:
+      - CGO_ENABLED=0
+    goos:
       - windows
     goarch:
       - amd64
@@ -27,13 +74,28 @@ builds:
         - cmd: "./.goreleaser/post-build.sh {{ .Path }} {{ .Name }}"
           output: true
 
+universal_binary:
+  - id: perfmon-darwin-universal
+    ids:
+      - perfmon-darwin-amd64
+      - perfmon-darwin-arm64
+    name_template: "perfmon-tool-{{ .Version }}-darwin-universal"
+
 archives:
-  - id: binary
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: linux-binaries
+    builds: [perfmon-linux]
+    name_template: "perfmon-tool-{{ .Version }}-linux-{{ .Arch }}"
     formats: ["binary"]
-    files:
-      - LICENSE
-      - README.md
+
+  - id: darwin-universal
+    builds: [perfmon-darwin-universal]
+    name_template: "perfmon-tool-{{ .Version }}-darwin-universal"
+    formats: ["binary"]
+
+  - id: windows-binaries
+    builds: [perfmon-windows]
+    name_template: "perfmon-tool-{{ .Version }}-windows-{{ .Arch }}"
+    formats: ["binary"]
 
 checksum:
   name_template: "checksums.txt"
@@ -52,15 +114,15 @@ release:
 
     ### Installation
     ```bash
-    # macOS (Apple Silicon)
-    curl -LO https://github.com/GAM3RG33K/perfmon-lite/releases/download/{{ .Tag }}/perfmon_{{ .Version }}_darwin_arm64
-    chmod +x perfmon_{{ .Version }}_darwin_arm64
-    sudo mv perfmon_{{ .Version }}_darwin_arm64 /usr/local/bin/perfmon
+    # macOS (Universal)
+    curl -LO https://github.com/GAM3RG33K/perfmon-lite/releases/download/{{ .Tag }}/perfmon-tool-{{ .Version }}-darwin-universal
+    chmod +x perfmon-tool-{{ .Version }}-darwin-universal
+    sudo mv perfmon-tool-{{ .Version }}-darwin-universal /usr/local/bin/perfmon
 
     # Linux (x86_64)
-    curl -LO https://github.com/GAM3RG33K/perfmon-lite/releases/download/{{ .Tag }}/perfmon_{{ .Version }}_linux_amd64
-    chmod +x perfmon_{{ .Version }}_linux_amd64
-    sudo mv perfmon_{{ .Version }}_linux_amd64 /usr/local/bin/perfmon
+    curl -LO https://github.com/GAM3RG33K/perfmon-lite/releases/download/{{ .Tag }}/perfmon-tool-{{ .Version }}-linux-amd64
+    chmod +x perfmon-tool-{{ .Version }}-linux-amd64
+    sudo mv perfmon-tool-{{ .Version }}-linux-amd64 /usr/local/bin/perfmon
     ```
   footer: |
     ### Checksums

@@ -9,7 +9,7 @@
 set -euo pipefail
 
 REPO="GAM3RG33K/perfmon-lite"
-BIN_NAME="perfmon"
+BIN_NAME="perfmon-tool"
 
 # ── Detect platform ────────────────────────────────────────────────────
 OS="$(uname -s)"
@@ -54,7 +54,14 @@ fi
 echo "  latest release: $LATEST"
 
 # ── Download binary ────────────────────────────────────────────────────
-ASSET="perfmon_${LATEST#v}_${GOOS}_${GOARCH}"
+VER="${LATEST#v}"
+if [ "$GOOS" = "darwin" ]; then
+  ASSET="perfmon-tool-${VER}-darwin-universal"
+elif [ "$GOOS" = "windows" ]; then
+  ASSET="perfmon-tool-${VER}-windows-${GOARCH}.exe"
+else
+  ASSET="perfmon-tool-${VER}-linux-${GOARCH}"
+fi
 URL="https://github.com/${REPO}/releases/download/${LATEST}/${ASSET}"
 
 TMPDIR=$(mktemp -d)

@@ -74,7 +74,7 @@ else {
 
 # ── Download and replace ───────────────────────────────────────────────
 $Version = $Latest.TrimStart("v")
-$Asset = "perfmon_${Version}_windows_${GoArch}.exe"
+$Asset = "perfmon-tool-${Version}-windows-${GoArch}.exe"
 $Url = "https://github.com/${Repo}/releases/download/${Latest}/${Asset}"
 
 $TmpFile = "$env:TEMP\perfmon_update.exe"

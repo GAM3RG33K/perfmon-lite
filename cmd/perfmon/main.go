@@ -600,11 +600,13 @@ func runUpdate(verbose bool) {
 	goos := runtime.GOOS
 	goarch := runtime.GOARCH
 	var assetName string
-	switch goos {
-	case "windows":
-		assetName = fmt.Sprintf("perfmon-tool_%s_%s_%s.exe", latestVer, goos, goarch)
+	switch {
+	case goos == "darwin":
+		assetName = fmt.Sprintf("perfmon-tool-%s-darwin-universal", latestVer)
+	case goos == "windows":
+		assetName = fmt.Sprintf("perfmon-tool-%s-windows-%s.exe", latestVer, goarch)
 	default:
-		assetName = fmt.Sprintf("perfmon_%s_%s_%s", latestVer, goos, goarch)
+		assetName = fmt.Sprintf("perfmon-tool-%s-linux-%s", latestVer, goarch)
 	}
 
 	url := fmt.Sprintf("https://github.com/GAM3RG33K/perfmon-lite/releases/download/%s/%s", latestTag, assetName)
