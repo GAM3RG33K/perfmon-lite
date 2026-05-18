@@ -402,8 +402,15 @@ func autoDetectProvider(deviceID, appID string, verbose bool) (
 				matched := matchProcess(processes, appID)
 				if matched > 0 {
 					pid = matched
-				} else {
-					launchAppPrompt(devices, appID, engine.PlatformAndroid, verbose)
+				} else if launchAppPrompt(devices, appID, engine.PlatformAndroid, verbose) {
+					// App was launched — re-discover processes to get the PID
+					if newProv, newDevs, newProcs, newPID, newPlat, err := tryAndroidProvider("", verbose); err == nil {
+						if m := matchProcess(newProcs, appID); m > 0 {
+							provider, devices, processes, pid, platform = newProv, newDevs, newProcs, m, newPlat
+						} else {
+							provider, devices, processes, pid, platform = newProv, newDevs, newProcs, newPID, newPlat
+						}
+					}
 				}
 			}
 			return
@@ -420,8 +427,15 @@ func autoDetectProvider(deviceID, appID string, verbose bool) (
 				matched := matchProcess(processes, appID)
 				if matched > 0 {
 					pid = matched
-				} else {
-					launchAppPrompt(devices, appID, engine.PlatformIOS, verbose)
+				} else if launchAppPrompt(devices, appID, engine.PlatformIOS, verbose) {
+					// App was launched — re-discover processes
+					if newProv, newDevs, newProcs, newPID, newPlat, err := tryiOSProvider(verbose); err == nil {
+						if m := matchProcess(newProcs, appID); m > 0 {
+							provider, devices, processes, pid, platform = newProv, newDevs, newProcs, m, newPlat
+						} else {
+							provider, devices, processes, pid, platform = newProv, newDevs, newProcs, newPID, newPlat
+						}
+					}
 				}
 			}
 			return
@@ -508,10 +522,10 @@ func matchProcess(processes []engine.AppProcess, appID string) int32 {
 }
 
 // launchAppPrompt asks the user whether to launch the specified app.
-// If yes, it attempts to launch it. If no, it continues without launching.
-func launchAppPrompt(devices []engine.Device, appID string, platform engine.Platform, verbose bool) {
+// Returns true if the app was launched successfully.
+func launchAppPrompt(devices []engine.Device, appID string, platform engine.Platform, verbose bool) bool {
 	if len(devices) == 0 {
-		return
+		return false
 	}
 	deviceName := devices[0].Name
 	if deviceName == "" {
@@ -525,18 +539,18 @@ func launchAppPrompt(devices []engine.Device, appID string, platform engine.Plat
 	fmt.Scanln(&response)
 	if response != "y" && response != "Y" && response != "yes" {
 		fmt.Fprintf(os.Stderr, "  Skipping launch. Telemetry will start when the app is manually launched.\n")
-		return
+		return false
 	}
 
 	fmt.Fprintf(os.Stderr, "  Launching %q...\n", appID)
 
+	launched := false
 	if platform == engine.PlatformAndroid {
 		adbPath, err := android.FindAdbPath()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  Cannot launch: ADB not found (%v)\n", err)
-			return
+			return false
 		}
-		// Try monkey first
 		cmd := exec.Command(adbPath, "-s", devices[0].ID, "shell", "monkey", "-p", appID, "1")
 		if out, err := cmd.CombinedOutput(); err != nil {
 			if verbose {
@@ -545,25 +559,29 @@ func launchAppPrompt(devices []engine.Device, appID string, platform engine.Plat
 			cmd = exec.Command(adbPath, "-s", devices[0].ID, "shell", "am", "start", "-n", appID+"/.MainActivity")
 			if out, err := cmd.CombinedOutput(); err != nil {
 				fmt.Fprintf(os.Stderr, "  Launch failed: %s\n", strings.TrimSpace(string(out)))
-				return
+				return false
 			}
 		}
-		fmt.Fprintf(os.Stderr, "  ✓ App launched successfully!\n")
+		launched = true
 	} else if platform == engine.PlatformIOS {
 		xcrunPath, err := iosPkg.FindXcrunPath()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  Cannot launch: xcrun not found (%v)\n", err)
-			return
+			return false
 		}
 		cmd := exec.Command(xcrunPath, "simctl", "launch", devices[0].ID, appID)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			fmt.Fprintf(os.Stderr, "  Launch failed: %s\n", strings.TrimSpace(string(out)))
-			return
+			return false
 		}
-		fmt.Fprintf(os.Stderr, "  ✓ App launched successfully!\n")
+		launched = true
 	}
 
-	fmt.Fprintf(os.Stderr, "  Telemetry will start shortly...\n")
+	if launched {
+		fmt.Fprintf(os.Stderr, "  ✓ App launched! Re-detecting...\n")
+		return true
+	}
+	return false
 }
 
 // resolvedAppName finds the package name matching a PID in the process list.
