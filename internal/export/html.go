@@ -348,7 +348,8 @@ func buildSVGLinePoints(snapshots []engine.TelemetrySnapshot, width, height int,
 	return b.String()
 }
 
-// buildASCIISparkline creates an ASCII sparkline string for Markdown export.
+// buildASCIISparkline creates an ASCII line chart string for Markdown export.
+// Uses Unicode half-blocks for a line-fill style matching the TUI.
 func buildASCIISparkline(snapshots []engine.TelemetrySnapshot, valueFn func(engine.TelemetrySnapshot) float64, minVal, maxVal float64) string {
 	if len(snapshots) < 2 {
 		return ""
@@ -359,14 +360,13 @@ func buildASCIISparkline(snapshots []engine.TelemetrySnapshot, valueFn func(engi
 		width = len(snapshots)
 	}
 
-	// Sample evenly
 	step := float64(len(snapshots)) / float64(width)
-	height := 5
+	height := 6
 	canvas := make([][]rune, height)
 	for i := range canvas {
 		canvas[i] = make([]rune, width)
 		for j := range canvas[i] {
-			canvas[i][j] = ' '
+			canvas[i][j] = '.'
 		}
 	}
 
@@ -381,15 +381,38 @@ func buildASCIISparkline(snapshots []engine.TelemetrySnapshot, valueFn func(engi
 			idx = len(snapshots) - 1
 		}
 		val := valueFn(snapshots[idx])
-		barHeight := int(((val - minVal) / rangeY) * float64(height-1))
-		if barHeight < 0 {
-			barHeight = 0
+		normalized := (val - minVal) / rangeY
+		// Map to cell row (0 = top, height-1 = bottom)
+		cellRow := height - 1 - int(normalized*float64(height-1))
+		if cellRow < 0 {
+			cellRow = 0
 		}
-		if barHeight >= height {
-			barHeight = height - 1
+		if cellRow >= height {
+			cellRow = height - 1
 		}
-		for row := height - 1; row > height-1-barHeight; row-- {
-			canvas[row][i] = '█'
+		// Fill from cellRow to bottom
+		for row := cellRow; row < height; row++ {
+			if row == cellRow {
+				canvas[row][i] = '█' // line point
+			} else {
+				canvas[row][i] = '▓' // fill below
+			}
+		}
+		// Half-block precision: if the point falls between rows, use ▄ or ▀
+		frac := (normalized*float64(height-1) - float64(height-1-cellRow))
+		if frac > 0.3 && frac < 0.7 && cellRow > 0 {
+			canvas[cellRow][i] = '▄'
+		}
+	}
+
+	// If there are consecutive identical rows with █, connect with │
+	for i := 1; i < width-1; i++ {
+		for row := 0; row < height-1; row++ {
+			if canvas[row][i] == '█' && canvas[row][i-1] != '█' && canvas[row+1][i] == '▓' {
+				if canvas[row+1][i-1] == '▓' {
+					canvas[row][i] = '╱'
+				}
+			}
 		}
 	}
 

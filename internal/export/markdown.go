@@ -39,7 +39,7 @@ const markdownTemplate = `# perfmon Telemetry Report
 {{ .CPUSparkline }}
 ` + "```" + `
 
-> CPU range: 0%–100%
+> Line chart (█ = value, ▓ = fill). Range: 0%–100%
 
 ---
 
@@ -49,7 +49,7 @@ const markdownTemplate = `# perfmon Telemetry Report
 {{ .MemSparkline }}
 ` + "```" + `
 
-> Memory values in MB
+> Line chart (█ = value, ▓ = fill). Values in MB
 
 ---
 

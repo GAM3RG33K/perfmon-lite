@@ -403,9 +403,7 @@ func autoDetectProvider(deviceID, appID string, verbose bool) (
 				if matched > 0 {
 					pid = matched
 				} else {
-					fmt.Fprintf(os.Stderr, "App %q not running on Android — attempting to launch...\n", appID)
-					launchAppOnDevice(devices, appID, nil, nil, "", verbose)
-					fmt.Fprintf(os.Stderr, "  Waiting for app to start...\n")
+					launchAppPrompt(devices, appID, engine.PlatformAndroid, verbose)
 				}
 			}
 			return
@@ -423,10 +421,7 @@ func autoDetectProvider(deviceID, appID string, verbose bool) (
 				if matched > 0 {
 					pid = matched
 				} else {
-					fmt.Fprintf(os.Stderr, "App %q not running on iOS — attempting to launch...\n", appID)
-					xcrun, _ := iosPkg.FindXcrunPath()
-					launchAppOnDevice(devices, appID, nil, nil, xcrun, verbose)
-					fmt.Fprintf(os.Stderr, "  Waiting for app to start...\n")
+					launchAppPrompt(devices, appID, engine.PlatformIOS, verbose)
 				}
 			}
 			return
@@ -512,37 +507,63 @@ func matchProcess(processes []engine.AppProcess, appID string) int32 {
 	return 0
 }
 
-// launchAppOnDevice attempts to launch a specified app on the connected device.
-// For Android: uses `adb shell monkey -p <package> 1`
-// For iOS: uses `xcrun simctl launch <udid> <bundle-id>`
-func launchAppOnDevice(devices []engine.Device, appID string, versionCheck interface{}, devCheck interface{}, xcrunPath string, verbose bool) {
+// launchAppPrompt asks the user whether to launch the specified app.
+// If yes, it attempts to launch it. If no, it continues without launching.
+func launchAppPrompt(devices []engine.Device, appID string, platform engine.Platform, verbose bool) {
 	if len(devices) == 0 {
 		return
 	}
+	deviceName := devices[0].Name
+	if deviceName == "" {
+		deviceName = devices[0].ID
+	}
 
-	// Android: try monkey
-	if devices[0].Platform == engine.PlatformAndroid {
+	fmt.Fprintf(os.Stderr, "\n  ⚠ App %q is not running on %s (%s)\n", appID, deviceName, platform)
+	fmt.Fprint(os.Stderr, "  Would you like to launch it? [y/N]: ")
+
+	var response string
+	fmt.Scanln(&response)
+	if response != "y" && response != "Y" && response != "yes" {
+		fmt.Fprintf(os.Stderr, "  Skipping launch. Telemetry will start when the app is manually launched.\n")
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "  Launching %q...\n", appID)
+
+	if platform == engine.PlatformAndroid {
 		adbPath, err := android.FindAdbPath()
-		if err == nil {
-			// Try monkey first (works on most devices)
-			cmd := exec.Command(adbPath, "-s", devices[0].ID, "shell", "monkey", "-p", appID, "1")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  Cannot launch: ADB not found (%v)\n", err)
+			return
+		}
+		// Try monkey first
+		cmd := exec.Command(adbPath, "-s", devices[0].ID, "shell", "monkey", "-p", appID, "1")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			if verbose {
+				log.Printf("monkey launch failed, trying am start: %s", string(out))
+			}
+			cmd = exec.Command(adbPath, "-s", devices[0].ID, "shell", "am", "start", "-n", appID+"/.MainActivity")
 			if out, err := cmd.CombinedOutput(); err != nil {
-				if verbose {
-					log.Printf("monkey launch failed, trying am start: %s", string(out))
-				}
-				// Fallback: am start
-				cmd = exec.Command(adbPath, "-s", devices[0].ID, "shell", "am", "start", "-n", appID+"/.MainActivity")
-				if out, err := cmd.CombinedOutput(); err != nil && verbose {
-					log.Printf("am start also failed: %s", string(out))
-				}
+				fmt.Fprintf(os.Stderr, "  Launch failed: %s\n", strings.TrimSpace(string(out)))
+				return
 			}
 		}
-	} else if devices[0].Platform == engine.PlatformIOS && xcrunPath != "" {
-		cmd := exec.Command(xcrunPath, "simctl", "launch", devices[0].ID, appID)
-		if out, err := cmd.CombinedOutput(); err != nil && verbose {
-			log.Printf("simctl launch failed: %s", string(out))
+		fmt.Fprintf(os.Stderr, "  ✓ App launched successfully!\n")
+	} else if platform == engine.PlatformIOS {
+		xcrunPath, err := iosPkg.FindXcrunPath()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  Cannot launch: xcrun not found (%v)\n", err)
+			return
 		}
+		cmd := exec.Command(xcrunPath, "simctl", "launch", devices[0].ID, appID)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			fmt.Fprintf(os.Stderr, "  Launch failed: %s\n", strings.TrimSpace(string(out)))
+			return
+		}
+		fmt.Fprintf(os.Stderr, "  ✓ App launched successfully!\n")
 	}
+
+	fmt.Fprintf(os.Stderr, "  Telemetry will start shortly...\n")
 }
 
 // resolvedAppName finds the package name matching a PID in the process list.

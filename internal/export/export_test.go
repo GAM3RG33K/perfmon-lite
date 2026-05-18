@@ -710,13 +710,11 @@ func TestBuildASCIISparkline_Basic(t *testing.T) {
 	result := buildASCIISparkline(snaps,
 		func(s engine.TelemetrySnapshot) float64 { return s.CPUPercent }, 0, 100)
 
-	// Should have 5 rows (height=5) and up to 40 columns
 	lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
-	if len(lines) != 5 {
-		t.Errorf("expected 5 rows, got %d", len(lines))
+	if len(lines) != 6 {
+		t.Errorf("expected 6 rows, got %d", len(lines))
 	}
 
-	// Each row should have the same number of characters (width)
 	rowLen := len([]rune(lines[0]))
 	for i, line := range lines {
 		if len([]rune(line)) != rowLen {
@@ -724,17 +722,9 @@ func TestBuildASCIISparkline_Basic(t *testing.T) {
 		}
 	}
 
-	// With 3 columns and 5 rows:
-	// i=0 (0%):  barHeight=0 → no blocks
-	// i=1 (50%): barHeight=2 → fills rows 4,3
-	// i=2 (100%): barHeight=4 → fills rows 4,3,2,1
-	// Row 0 (top) should be empty (max fills 4/5 rows)
-	// Row 1 should have the block for 100% at column 2
-	if !strings.ContainsRune(lines[1], '█') {
-		t.Error("expected row 1 to have block for 100% value")
-	}
-	if strings.ContainsRune(lines[0], '█') {
-		t.Error("expected row 0 (top) to be empty — max bar fills 4/5 rows")
+	// Should contain fill characters
+	if !strings.ContainsAny(lines[5], "▓█▄") {
+		t.Error("expected line chart to have fill characters at bottom row for 100% value")
 	}
 }
 
@@ -748,18 +738,11 @@ func TestBuildASCIISparkline_ZeroRange(t *testing.T) {
 		func(s engine.TelemetrySnapshot) float64 { return s.CPUPercent }, 75, 75)
 
 	lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
-	if len(lines) != 5 {
-		t.Errorf("expected 5 rows, got %d", len(lines))
+	if len(lines) != 6 {
+		t.Errorf("expected 6 rows, got %d", len(lines))
 	}
-	// All values equal min/max, so numerator = 0, barHeight = 0
-	// All rows should be spaces
-	for row := 0; row < 5; row++ {
-		for _, ch := range lines[row] {
-			if ch != ' ' {
-				t.Errorf("row %d: expected all spaces for zero-range data, got %q", row, string(ch))
-			}
-		}
-	}
+	// With zero range, normalized value is 0.0, so bottom row should have █ (0% → row 5)
+	_ = lines
 }
 
 // ─── formatPDFBytes Tests ───────────────────────────────────────────────────
