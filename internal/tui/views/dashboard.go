@@ -10,6 +10,9 @@ import (
 	"github.com/w1n/perfmon/internal/tui/styles"
 )
 
+// maxChartPoints is the maximum number of data points shown in the ASCII chart.
+const maxChartPoints = 100
+
 type DashboardView struct {
 	Width  int
 	Height int
@@ -19,16 +22,26 @@ func NewDashboardView() *DashboardView {
 	return &DashboardView{Width: 80, Height: 24}
 }
 
+// limitSnapshots returns the last n snapshots for chart display.
+func limitSnapshots(s []engine.TelemetrySnapshot, n int) []engine.TelemetrySnapshot {
+	if len(s) <= n {
+		return s
+	}
+	return s[len(s)-n:]
+}
+
 func (dv *DashboardView) Render(snapshots []engine.TelemetrySnapshot, latest *engine.TelemetrySnapshot) string {
 	if dv.Width < 40 {
 		return "Terminal too narrow for dashboard"
 	}
+	// Limit chart data to the last maxChartPoints for readability
+	chartData := limitSnapshots(snapshots, maxChartPoints)
 	var b strings.Builder
 	b.WriteString(renderHeader(latest))
 	b.WriteString("\n\n")
-	b.WriteString(renderCPUChart(snapshots, dv.Width-8))
+	b.WriteString(renderCPUChart(chartData, dv.Width-8))
 	b.WriteString("\n\n")
-	b.WriteString(renderMemoryChart(snapshots, dv.Width-8))
+	b.WriteString(renderMemoryChart(chartData, dv.Width-8))
 	b.WriteString("\n\n")
 	b.WriteString(renderStatsRow(snapshots))
 	b.WriteString("\n")

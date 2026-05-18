@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -177,8 +178,14 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "l":
-		m.Logs.AddEntry("INFO", "Logs exported to system output")
-		m.setStatus("✓ Logs exported")
+		path, err := m.exportLogs()
+		if err != nil {
+			m.Logs.AddEntry("ERROR", fmt.Sprintf("Log export failed: %v", err))
+			m.setStatus(styles.ErrorStyle.Render("✗ Log export failed"))
+		} else {
+			m.Logs.AddEntry("INFO", fmt.Sprintf("Logs exported to %s", path))
+			m.setStatus(fmt.Sprintf("✓ Logs exported to %s", path))
+		}
 		return m, nil
 
 	case "e":
@@ -390,7 +397,7 @@ func (m *Model) renderMainView() string {
 	// Bottom log panel (always visible as a compact console)
 	b.WriteString(styles.LabelStyle.Render(strings.Repeat("─", m.Width-2)))
 	b.WriteString("\n")
-	logContent := m.Logs.RenderRecent(4)
+	logContent := m.Logs.RenderRecent(5)
 	b.WriteString(styles.PanelBorder.Width(bodyWidth).Render(logContent))
 	b.WriteString("\n")
 
@@ -540,6 +547,24 @@ func (m *Model) exportCurrentData(formatType export.Format) (string, error) {
 	path, err := export.Export(snapshots, opts)
 	if err != nil {
 		return "", fmt.Errorf("export: %w", err)
+	}
+	return path, nil
+}
+
+// exportLogs writes captured logs to a .log file in the current directory.
+func (m *Model) exportLogs() (string, error) {
+	path := fmt.Sprintf("perfmon_logs_%d.log", time.Now().Unix())
+	f, err := os.Create(path)
+	if err != nil {
+		return "", fmt.Errorf("creating log file: %w", err)
+	}
+	defer f.Close()
+
+	for _, e := range m.Logs.Entries {
+		line := fmt.Sprintf("[%s] [%s] %s\n", e.Timestamp.Format("15:04:05"), e.Level, e.Message)
+		if _, err := f.WriteString(line); err != nil {
+			return "", fmt.Errorf("writing log file: %w", err)
+		}
 	}
 	return path, nil
 }
