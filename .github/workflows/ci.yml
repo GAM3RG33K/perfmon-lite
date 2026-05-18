@@ -228,8 +228,9 @@ jobs:
 
       - name: Get version
         run: |
-          VER=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+          VER=$(git describe --tags --abbrev=0 2>/dev/null || cat VERSION 2>/dev/null || echo "dev")
           echo "VITE_APP_VERSION=${VER#v}" >> $GITHUB_ENV
+          echo "VITE_APP_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo 'dev')" >> $GITHUB_ENV
 
       - uses: actions/setup-node@v4
         with:
