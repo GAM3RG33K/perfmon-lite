@@ -225,7 +225,7 @@ const htmlTemplate = `<!DOCTYPE html>
   {{- range $i, $s := .Telemetry }}
   {{- if $s.Stack }}
     <details class="stack-details">
-      <summary class="stack-summary">Sample {{ add $i 1 }} — CPU {{ printf "%.1f" $s.CPUPercent }}% at {{ formatUnix $s.Timestamp }}</summary>
+      <summary class="stack-summary">Sample {{ inc $i }} — CPU {{ printf "%.1f" $s.CPUPercent }}% at {{ formatUnix $s.Timestamp }}</summary>
       <pre class="stack-pre">{{ $s.Stack }}</pre>
     </details>
   {{- end }}
@@ -303,6 +303,7 @@ func ExportHTML(data ExportData, snapshots []engine.TelemetrySnapshot, opts Opti
 
 	funcMap := template.FuncMap{
 		"add":            func(a, b, c int) int { return a + b + c - 2 },
+		"inc":            func(a int) int { return a + 1 },
 		"sub":            func(a, b int) int { return a - b },
 		"modcheck":       func(a, b int) bool { return a%b == 0 },
 		"slice":          func(s []engine.TelemetrySnapshot, start int) []engine.TelemetrySnapshot { if start >= len(s) { return nil }; return s[start:] },
