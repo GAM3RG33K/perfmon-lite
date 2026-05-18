@@ -55,10 +55,25 @@ const markdownTemplate = `# perfmon Telemetry Report
 
 ## Telemetry Data ({{ len .Telemetry }} samples)
 
-| # | Timestamp | CPU (%) | Memory (KB) | Threads |
-|---|-----------|---------|-------------|---------|
+| # | Timestamp | CPU (%) | Memory (KB) | Threads | Stack |
+|---|-----------|---------|-------------|---------|-------|
 {{- range $i, $s := .Telemetry }}
-| {{ add $i 1 }} | {{ formatUnix $s.Timestamp }} | {{ printf "%.1f" $s.CPUPercent }} | {{ $s.MemoryKB }} | {{ $s.Threads }} |
+| {{ add $i 1 }} | {{ formatUnix $s.Timestamp }} | {{ printf "%.1f" $s.CPUPercent }} | {{ $s.MemoryKB }} | {{ $s.Threads }} | {{ if $s.Stack }}Yes{{ else }}-{{ end }} |
+{{- end }}
+
+### Stack Traces
+
+Samples with significant CPU usage (>50%) include kernel or user-space stack traces:
+
+{{- range $i, $s := .Telemetry }}
+{{- if $s.Stack }}
+**Sample {{ add $i 1 }}** (CPU={{ printf "%.1f" $s.CPUPercent }}% at {{ formatUnix $s.Timestamp }})
+
+` + "```" + `
+{{ $s.Stack }}
+` + "```" + `
+
+{{- end }}
 {{- end }}
 
 ---
