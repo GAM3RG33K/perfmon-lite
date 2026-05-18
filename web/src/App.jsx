@@ -17,29 +17,6 @@ const COMMANDS = [
   ['perfmon-tool update', 'Self-update to latest'],
 ]
 
-function useTypewriter(lines, speed = 12) {
-  const [visible, setVisible] = useState([])
-  const idxRef = useRef(0)
-  const charRef = useRef(0)
-  useEffect(() => {
-    const t = setInterval(() => {
-      if (idxRef.current >= lines.length) { clearInterval(t); return }
-      const line = lines[idxRef.current]
-      if (charRef.current <= line.length) {
-        setVisible(prev => {
-          const copy = [...prev]
-          if (!copy[idxRef.current]) copy[idxRef.current] = ''
-          copy[idxRef.current] = line.slice(0, charRef.current)
-          return copy
-        })
-        charRef.current++
-      } else { idxRef.current++; charRef.current = 0 }
-    }, speed)
-    return () => clearInterval(t)
-  }, [lines, speed])
-  return visible
-}
-
 function useScrollY() {
   const [y, setY] = useState(0)
   useEffect(() => {
@@ -62,10 +39,28 @@ function useMousePos() {
   return pos
 }
 
+/* ─── Device detection ─────────────────────────────────── */
+
+function useDeviceInfo() {
+  const [info] = useState(() => {
+    const ua = navigator.userAgent
+    let device = 'Desktop'
+    let platform = 'unknown'
+    if (/iPhone|iPad|iPod/.test(ua)) { device = 'iPhone'; platform = 'ios' }
+    else if (/Android/.test(ua)) { device = 'Android Device'; platform = 'android' }
+    else if (/Mac/.test(ua)) { device = 'Mac'; platform = 'darwin' }
+    else if (/Linux/.test(ua)) { device = 'Linux PC'; platform = 'linux' }
+    else if (/Windows/.test(ua)) { device = 'Windows PC'; platform = 'windows' }
+    return { device, platform, cores: navigator.hardwareConcurrency || 4 }
+  })
+  return info
+}
+
 /* ─── Live metrics hook ────────────────────────────────── */
 
-function useLiveMetrics() {
+function useLiveMetrics(deviceName) {
   const [metrics, setMetrics] = useState(() => ({
+    device: deviceName,
     cpuCores: navigator.hardwareConcurrency || 4,
     cpuLoad: 34,
     memUsed: 3.2,
@@ -172,14 +167,15 @@ function Bar({ pct, color }) {
 }
 
 function LiveTerminal({ mouse }) {
-  const m = useLiveMetrics()
+  const device = useDeviceInfo()
+  const m = useLiveMetrics(device.device)
   const ver = import.meta.env.VITE_APP_VERSION || 'dev'
   const memPct = Math.round((m.memUsed / parseFloat(m.memTotal)) * 100)
   const cachePct = Math.max(Math.round(memPct * 0.3), 2)
 
   const lines = [
     `┌─────────────────────────────────────────────────────────────────────┐`,
-    `│ perfmon-tool v${ver.padEnd(14)} Device: Pixel 8            Uptime: ${m.uptime.padEnd(5)} │`,
+    `│ perfmon-tool v${(ver + ' ').padEnd(14)} Device: ${m.device.padEnd(18)} Uptime: ${m.uptime.padEnd(5)} │`,
     `├─────────────────────────────────────────────────────────────────────┤`,
     `│ [Dashboard]  [Processes]  [System Logs]                      (q) quit │`,
     `├─────────────────────────────────────────────────────────────────────┤`,
@@ -202,8 +198,6 @@ function LiveTerminal({ mouse }) {
     `└─────────────────────────────────────────────────────────────────────┘`,
   ]
 
-  const typed = useTypewriter(lines, 10)
-
   return (
     <section className="terminal-section">
       <div className="terminal" style={{
@@ -214,11 +208,12 @@ function LiveTerminal({ mouse }) {
           <span className="terminal-title">perfmon-tool — live</span>
         </div>
         <div className="terminal-body">
-          {typed.map((l, i) => (
+          {lines.map((l, i) => (
             <div key={i} className={`line ${i >= 6 && i <= 9 ? 'cyan' : i >= 11 && i <= 15 ? 'magenta' : i === 17 ? 'amber' : 'dim'}`}>
-              {l}{i < typed.length - 1 ? '' : <span className="cursor">▌</span>}
+              {l}
             </div>
           ))}
+          <span className="cursor">▌</span>
         </div>
       </div>
     </section>
