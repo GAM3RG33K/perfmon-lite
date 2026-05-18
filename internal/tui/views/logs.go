@@ -66,6 +66,35 @@ func (lv *LogsView) ScrollDown() {
 	}
 }
 
+// RenderRecent returns the last `n` log lines (for bottom console panel).
+func (lv *LogsView) RenderRecent(n int) string {
+	if len(lv.Entries) == 0 {
+		return styles.LabelStyle.Render("  System ready. Waiting for telemetry...")
+	}
+	var b strings.Builder
+	start := len(lv.Entries) - n
+	if start < 0 {
+		start = 0
+	}
+	for i := start; i < len(lv.Entries); i++ {
+		entry := lv.Entries[i]
+		var levelColor lipgloss.Color
+		switch entry.Level {
+		case "ERROR":
+			levelColor = styles.Red
+		case "WARN":
+			levelColor = styles.Amber
+		case "INFO":
+			levelColor = styles.Green
+		default:
+			levelColor = styles.DimWhite
+		}
+		levelStr := lipgloss.NewStyle().Foreground(levelColor).Bold(true).Width(5).Render(entry.Level)
+		b.WriteString(fmt.Sprintf(" %s %s\n", levelStr, entry.Message))
+	}
+	return b.String()
+}
+
 // Render draws the log viewer.
 func (lv *LogsView) Render() string {
 	if lv.Width < 40 {

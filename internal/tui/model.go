@@ -14,17 +14,14 @@ import (
 	"github.com/w1n/perfmon/internal/tui/views"
 )
 
-// Tab identifiers
 const (
 	TabDashboard = iota
-	TabThreads
 	TabLogs
 	TabCount
 )
 
-var tabNames = []string{"Dashboard", "Threads/Procs", "System Logs"}
+var tabNames = []string{"Dashboard", "System Logs"}
 
-// Model is the root Bubble Tea model for the perfmon TUI.
 type Model struct {
 	Engine *engine.Engine
 	Mock   bool
@@ -45,11 +42,9 @@ type Model struct {
 	statusMsg  string
 	statusTime time.Time
 
-	// Export format picker state
 	showFormatPicker bool
 	formatPickerIdx  int
 
-	// PID of the currently selected app (0 = use first process)
 	AppPID int32
 }
 
@@ -75,28 +70,18 @@ func (m *Model) Init() tea.Cmd {
 	return m.Engine.Start()
 }
 
-// ClearStatusMsg is sent after a short delay to clear the status bar.
 type ClearStatusMsg struct{}
-
-func clearStatusAfter(d time.Duration) tea.Cmd {
-	return tea.Tick(d, func(t time.Time) tea.Msg {
-		return ClearStatusMsg{}
-	})
-}
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
 		m.Ready = true
 		m.Dashboard.Width = msg.Width - 4
-		m.Dashboard.Height = msg.Height - 8
-		m.TargetSelector.Width = msg.Width - 4
-		m.TargetSelector.Height = msg.Height - 8
+		m.Dashboard.Height = msg.Height - 10
 		m.Logs.Width = msg.Width - 4
-		m.Logs.Height = msg.Height - 8
+		m.Logs.Height = msg.Height - 10
 		return m, nil
 
 	case tea.KeyMsg:
@@ -118,7 +103,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// If help is open, only handle escape/enter to close
 	if m.ShowHelp {
 		switch msg.String() {
 		case "?", "q", "esc", "enter", "ctrl+c":
@@ -127,64 +111,30 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// If format picker is open, handle navigation
 	if m.showFormatPicker {
 		return m.handlePickerKey(msg)
 	}
 
 	switch msg.String() {
-
 	case "q", "ctrl+c":
 		m.Quitting = true
 		m.Logs.AddEntry("INFO", "Shutting down...")
 		m.Engine.Close()
 		return m, tea.Quit
 
-	case "tab":
-		m.ActiveTab = (m.ActiveTab + 1) % TabCount
-		return m, nil
-
-	case "shift+tab":
-		m.ActiveTab = (m.ActiveTab - 1 + TabCount) % TabCount
-		return m, nil
-
-	case "left":
-		m.ActiveTab = (m.ActiveTab - 1 + TabCount) % TabCount
-		return m, nil
-
-	case "right":
+	case "tab", "shift+tab", "left", "right":
 		m.ActiveTab = (m.ActiveTab + 1) % TabCount
 		return m, nil
 
 	case "up":
-		switch m.ActiveTab {
-		case TabLogs:
+		if m.ActiveTab == TabLogs {
 			m.Logs.ScrollUp()
-		case TabThreads:
-			if m.TargetSelector.ShowProcesses && m.TargetSelector.SelectedProcess > 0 {
-				m.TargetSelector.SelectedProcess--
-			} else if !m.TargetSelector.ShowProcesses && m.TargetSelector.SelectedDevice > 0 {
-				m.TargetSelector.SelectedDevice--
-			}
 		}
 		return m, nil
 
 	case "down":
-		switch m.ActiveTab {
-		case TabLogs:
+		if m.ActiveTab == TabLogs {
 			m.Logs.ScrollDown()
-		case TabThreads:
-			if m.TargetSelector.ShowProcesses && m.TargetSelector.SelectedProcess < len(m.TargetSelector.Processes)-1 {
-				m.TargetSelector.SelectedProcess++
-			} else if !m.TargetSelector.ShowProcesses && m.TargetSelector.SelectedDevice < len(m.TargetSelector.Devices)-1 {
-				m.TargetSelector.SelectedDevice++
-			}
-		}
-		return m, nil
-
-	case "enter":
-		if m.ActiveTab == TabThreads && len(m.TargetSelector.Processes) > 0 {
-			m.TargetSelector.ShowProcesses = true
 		}
 		return m, nil
 
@@ -216,19 +166,11 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ActiveTab = TabDashboard
 		return m, nil
 	case "2":
-		m.ActiveTab = TabThreads
-		return m, nil
-	case "3":
 		m.ActiveTab = TabLogs
 		return m, nil
 	}
-
 	return m, nil
 }
-
-// handlePickerKey processes keys during export format selection.
-var pickerFormats = []export.Format{export.FormatJSON, export.FormatMD, export.FormatHTML}
-var pickerLabels = []string{"JSON", "Markdown", "HTML"}
 
 func (m *Model) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
@@ -249,43 +191,8 @@ func (m *Model) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// runExport exports data and shows result in the status bar.
-func (m *Model) runExport(formatType export.Format) (tea.Model, tea.Cmd) {
-	path, err := m.exportCurrentData(formatType)
-	if err != nil {
-		m.Logs.AddEntry("ERROR", fmt.Sprintf("Export failed: %v", err))
-		m.setStatus(styles.ErrorStyle.Render("✗ Export failed"))
-	} else {
-		m.Logs.AddEntry("INFO", fmt.Sprintf("Exported to %s", path))
-		shortPath := path
-		if len(shortPath) > 40 {
-			shortPath = "..." + shortPath[len(shortPath)-37:]
-		}
-		m.setStatus(fmt.Sprintf("✓ Exported to %s", shortPath))
-	}
-	return m, nil
-}
-
-// setStatus sets a status message that auto-clears after 3 seconds.
-func (m *Model) setStatus(msg string) {
-	m.statusMsg = msg
-	m.statusTime = time.Now()
-}
-
-// selectedProcess returns the process matching AppPID, or the first process if unset.
-func (m *Model) selectedProcess() *engine.AppProcess {
-	if m.AppPID > 0 {
-		for i := range m.TargetSelector.Processes {
-			if m.TargetSelector.Processes[i].PID == m.AppPID {
-				return &m.TargetSelector.Processes[i]
-			}
-		}
-	}
-	if len(m.TargetSelector.Processes) > 0 {
-		return &m.TargetSelector.Processes[0]
-	}
-	return nil
-}
+var pickerFormats = []export.Format{export.FormatJSON, export.FormatMD, export.FormatHTML}
+var pickerLabels = []string{"JSON", "Markdown", "HTML"}
 
 func (m *Model) handleTick() (tea.Model, tea.Cmd) {
 	return m, tea.Batch(
@@ -299,7 +206,6 @@ func (m *Model) handleTelemetry(msg engine.TelemetryMsg) (tea.Model, tea.Cmd) {
 		m.Logs.AddEntry("ERROR", msg.Error.Error())
 		return m, nil
 	}
-	// Auto-clear status after 3 seconds
 	if m.statusMsg != "" && time.Since(m.statusTime) > 3*time.Second {
 		m.statusMsg = ""
 	}
@@ -316,176 +222,113 @@ func (m *Model) View() string {
 	if m.Err != nil {
 		return fmt.Sprintf("\n  Error: %v\n", m.Err)
 	}
-
 	if m.ShowHelp {
 		return m.renderHelp()
 	}
 	if m.showFormatPicker {
 		return m.renderFormatPicker()
 	}
-
 	return m.renderMainView()
 }
 
-// renderFormatPicker shows a small centered modal for selecting export format.
-func (m *Model) renderFormatPicker() string {
-	// Render the normal view first, then overlay a modal on top
-	baseView := m.renderMainView()
-
-	// Build a small floating modal
-	var modal strings.Builder
-	modal.WriteString("\n")
-	title := styles.HighlightStyle.Render("  Select export format")
-	modal.WriteString(title)
-	modal.WriteString("\n\n")
-	for i, label := range pickerLabels {
-		if i == m.formatPickerIdx {
-			modal.WriteString(styles.HighlightStyle.Render("  ▸ " + label))
-		} else {
-			modal.WriteString(styles.LabelStyle.Render("    " + label))
-		}
-		modal.WriteString("\n")
-	}
-	modal.WriteString("\n")
-	modal.WriteString(styles.HelpFooter.Render("  ↑/↓  Enter  Esc"))
-
-	// Insert the modal into the center of the view
-	lines := strings.Split(baseView, "\n")
-	modalLines := strings.Split(strings.TrimRight(modal.String(), "\n"), "\n")
-	startY := len(lines)/2 - len(modalLines)/2
-	if startY < 0 {
-		startY = 0
-	}
-
-	var result strings.Builder
-	for i, line := range lines {
-		if i >= startY && i < startY+len(modalLines) {
-			idx := i - startY
-			result.WriteString(modalLines[idx])
-			result.WriteString("\n")
-		} else {
-			result.WriteString(line)
-			result.WriteString("\n")
+func (m *Model) selectedProcess() *engine.AppProcess {
+	if m.AppPID > 0 {
+		for i := range m.TargetSelector.Processes {
+			if m.TargetSelector.Processes[i].PID == m.AppPID {
+				return &m.TargetSelector.Processes[i]
+			}
 		}
 	}
-	return result.String()
+	if len(m.TargetSelector.Processes) > 0 {
+		return &m.TargetSelector.Processes[0]
+	}
+	return nil
 }
 
-// renderMainView renders the TUI content without the format picker overlay.
+func (m *Model) setStatus(msg string) {
+	m.statusMsg = msg
+	m.statusTime = time.Now()
+}
+
+func (m *Model) runExport(formatType export.Format) (tea.Model, tea.Cmd) {
+	path, err := m.exportCurrentData(formatType)
+	if err != nil {
+		m.Logs.AddEntry("ERROR", fmt.Sprintf("Export failed: %v", err))
+		m.setStatus(styles.ErrorStyle.Render("✗ Export failed"))
+	} else {
+		m.Logs.AddEntry("INFO", fmt.Sprintf("Exported to %s", path))
+		shortPath := path
+		if len(shortPath) > 40 {
+			shortPath = "..." + shortPath[len(shortPath)-37:]
+		}
+		m.setStatus(fmt.Sprintf("✓ Exported to %s", shortPath))
+	}
+	return m, nil
+}
+
+// ─── Main view with bottom log panel ────────────────────────
+
 func (m *Model) renderMainView() string {
 	var b strings.Builder
 
-	// Title bar
-	title := fmt.Sprintf(" perfmon v1.0.0 %s", styles.PlatformBadge(m.Platform))
+	// Title
+	title := fmt.Sprintf(" perfmon v0.0.1 %s", styles.PlatformBadge(m.Platform))
 	b.WriteString(styles.TitleStyle.Render(title))
 	b.WriteString("\n")
 
-	// Target info bar
+	// Target info
 	devices := m.TargetSelector.Devices
 	app := m.selectedProcess()
 	if len(devices) > 0 && app != nil {
-		info := fmt.Sprintf(" Target: %s  │  App: %s %s",
-			devices[0].Name,
-			app.PackageName,
-			styles.BuildBadge(app.BuildType),
-		)
+		info := fmt.Sprintf(" Target: %s  │  App: %s %s", devices[0].Name, app.PackageName, styles.BuildBadge(app.BuildType))
 		b.WriteString(styles.LabelStyle.Render(info))
 		b.WriteString("\n")
 	}
 
-	// Status bar (brief notifications)
+	// Status bar
 	if m.statusMsg != "" {
-		statusLine := styles.StatusBarStyle.Render(m.statusMsg)
-		b.WriteString(statusLine)
+		b.WriteString(styles.StatusBarStyle.Render(m.statusMsg))
 		b.WriteString("\n")
 	}
 
 	// Separator
-	sep := strings.Repeat("─", m.Width-2)
-	b.WriteString(styles.LabelStyle.Render(sep))
+	b.WriteString(styles.LabelStyle.Render(strings.Repeat("─", m.Width-2)))
 	b.WriteString("\n")
 
 	// Tabs
 	b.WriteString(m.renderTabs())
 	b.WriteString("\n")
 
-	// Body
-	var body string
+	// Main body area — dashboard on top, logs at bottom
 	bodyWidth := m.Width - 4
 	if bodyWidth < 10 {
 		bodyWidth = 10
 	}
+
+	// Dashboard section (top ~60% of available height)
+	var body string
 	switch m.ActiveTab {
 	case TabDashboard:
 		snapshots := m.Engine.Buffer.GetAll()
 		latest := m.Engine.Buffer.Latest()
 		body = m.Dashboard.Render(snapshots, latest)
-	case TabThreads:
-		body = m.TargetSelector.Render()
 	case TabLogs:
 		body = m.Logs.Render()
 	}
+
 	b.WriteString(styles.PanelBorder.Width(bodyWidth).Render(body))
+	b.WriteString("\n")
+
+	// Bottom log panel (always visible as a compact console)
+	b.WriteString(styles.LabelStyle.Render(strings.Repeat("─", m.Width-2)))
+	b.WriteString("\n")
+	logContent := m.Logs.RenderRecent(4)
+	b.WriteString(styles.PanelBorder.Width(bodyWidth).Render(logContent))
 	b.WriteString("\n")
 
 	// Footer
 	b.WriteString(m.renderFooter())
 
-	return b.String()
-}
-
-// renderHelp shows a full-screen help overlay.
-func (m *Model) renderHelp() string {
-	var b strings.Builder
-	b.WriteString("\n")
-	b.WriteString(styles.HelpTitle.Render("  perfmon — Help"))
-	b.WriteString("\n\n")
-
-	sections := []struct {
-		title string
-		keys  [][2]string
-	}{
-		{
-			"Navigation",
-			 [][2]string{
-				{"↑/↓", "Navigate lists"},
-				{"←/→", "Switch tabs"},
-				{"Tab", "Cycle forward"},
-				{"Shift+Tab", "Cycle backward"},
-				{"1-3", "Jump to tab"},
-			},
-		},
-		{
-			"Actions",
-			[][2]string{
-				{"Enter", "Select item / show processes"},
-				{"e", "Export to JSON"},
-				{"Shift+E", "Export to Markdown"},
-				{"Ctrl+E", "Export to HTML"},
-				{"r", "Refresh device list"},
-			},
-		},
-		{
-			"General",
-			[][2]string{
-				{"?", "Toggle this help"},
-				{"q / Ctrl+C", "Quit"},
-			},
-		},
-	}
-
-	for _, section := range sections {
-		b.WriteString(styles.HelpSectionTitle.Render("  " + section.title))
-		b.WriteString("\n")
-		for _, pair := range section.keys {
-			key := styles.HelpKey.Render("    " + pair[0])
-			desc := styles.HelpDesc.Render(pair[1])
-			b.WriteString(fmt.Sprintf("%s  %s\n", key, desc))
-		}
-		b.WriteString("\n")
-	}
-
-	b.WriteString(styles.HelpFooter.Render("  Press [?], Esc, Enter, or q to close help"))
 	return b.String()
 }
 
@@ -504,13 +347,8 @@ func (m *Model) renderTabs() string {
 
 func (m *Model) renderFooter() string {
 	hints := []string{
-		"[↑/↓] Navigate",
-		"[←/→] Tabs",
-		"[TAB] Switch",
-		"[e] Export",
-		"[r] Refresh",
-		"[?] Help",
-		"[q] Quit",
+		"[↑/↓] Scroll", "[TAB] Switch", "[e] Export",
+		"[r] Refresh", "[?] Help", "[q] Quit",
 	}
 	footerWidth := m.Width - 2
 	if footerWidth < 20 {
@@ -519,12 +357,89 @@ func (m *Model) renderFooter() string {
 	return styles.FooterStyle.Width(footerWidth).Render(strings.Join(hints, "  "))
 }
 
+func (m *Model) renderHelp() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(styles.HelpTitle.Render("  perfmon — Help"))
+	b.WriteString("\n\n")
+
+	sections := []struct {
+		title string
+		keys  [][2]string
+	}{
+		{"Navigation", [][2]string{
+			{"↑/↓", "Scroll logs / navigate lists"},
+			{"←/→ / Tab", "Switch tabs"},
+			{"1-2", "Jump to tab"},
+		}},
+		{"Actions", [][2]string{
+			{"e", "Open export format picker"},
+			{"Shift+E", "Export directly to Markdown"},
+			{"Ctrl+E", "Export directly to HTML"},
+			{"r", "Refresh device list"},
+		}},
+		{"General", [][2]string{
+			{"?", "Toggle this help"},
+			{"q / Ctrl+C", "Quit"},
+		}},
+	}
+
+	for _, section := range sections {
+		b.WriteString(styles.HelpSectionTitle.Render("  " + section.title))
+		b.WriteString("\n")
+		for _, pair := range section.keys {
+			key := styles.HelpKey.Render("    " + pair[0])
+			desc := styles.HelpDesc.Render(pair[1])
+			b.WriteString(fmt.Sprintf("%s  %s\n", key, desc))
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString(styles.HelpFooter.Render("  Press [?], Esc, Enter, or q to close help"))
+	return b.String()
+}
+
+func (m *Model) renderFormatPicker() string {
+	baseView := m.renderMainView()
+	var modal strings.Builder
+	modal.WriteString("\n")
+	modal.WriteString(styles.HighlightStyle.Render("  Select export format"))
+	modal.WriteString("\n\n")
+	for i, label := range pickerLabels {
+		if i == m.formatPickerIdx {
+			modal.WriteString(styles.HighlightStyle.Render("  ▸ " + label))
+		} else {
+			modal.WriteString(styles.LabelStyle.Render("    " + label))
+		}
+		modal.WriteString("\n")
+	}
+	modal.WriteString("\n")
+	modal.WriteString(styles.HelpFooter.Render("  ↑/↓  Enter  Esc"))
+
+	lines := strings.Split(baseView, "\n")
+	modalLines := strings.Split(strings.TrimRight(modal.String(), "\n"), "\n")
+	startY := len(lines)/2 - len(modalLines)/2
+	if startY < 0 {
+		startY = 0
+	}
+	var result strings.Builder
+	for i, line := range lines {
+		if i >= startY && i < startY+len(modalLines) {
+			result.WriteString(modalLines[i-startY])
+		} else {
+			result.WriteString(line)
+		}
+		result.WriteString("\n")
+	}
+	return result.String()
+}
+
+// exportCurrentData exports the current ring buffer to the given format.
 func (m *Model) exportCurrentData(formatType export.Format) (string, error) {
 	snapshots := m.Engine.Buffer.GetAll()
 	if len(snapshots) == 0 {
 		return "", fmt.Errorf("no telemetry data to export")
 	}
-
 	deviceName := "unknown"
 	if len(m.TargetSelector.Devices) > 0 {
 		deviceName = m.TargetSelector.Devices[0].Name
@@ -535,7 +450,6 @@ func (m *Model) exportCurrentData(formatType export.Format) (string, error) {
 		appName = app.PackageName
 		buildType = app.BuildType
 	}
-
 	opts := export.Options{
 		Format:     formatType,
 		OutputPath: "",

@@ -184,41 +184,43 @@ function CopyButton({ text }) {
 
 /* ─── Terminal with live metrics ────────────────────────── */
 
-function barStr(pct) {
-  const w = Math.max(Math.round(pct / 100 * 44), 1)
-  return '█'.repeat(w) + '─'.repeat(Math.max(44 - w, 0))
+// Draw a mini line chart using Unicode half-blocks
+function lineChartStr(pct) {
+  const w = 30
+  const filled = Math.round(pct / 100 * w)
+  let s = ''
+  for (let i = 0; i < w; i++) {
+    if (i < filled) s += '█'
+    else s += '░'
+  }
+  return s
 }
 
 function LiveTerminal({ mouse }) {
   const device = useDeviceInfo()
   const m = useLiveMetrics(device.device)
   const ver = import.meta.env.VITE_APP_VERSION || 'dev'
-  const memPct = Math.round((m.memUsed / parseFloat(m.memTotal)) * 100)
-  const cachePct = Math.max(Math.round(memPct * 0.3), 2)
 
   const lines = [
-    `┌─────────────────────────────────────────────────────────────────────┐`,
-    `│ perfmon-tool v${(ver + ' ').padEnd(14)} Device: ${m.device.padEnd(18)} Uptime: ${m.uptime.padEnd(5)} │`,
-    `├─────────────────────────────────────────────────────────────────────┤`,
-    `│ [Dashboard]  [Processes]  [System Logs]                      (q) quit │`,
-    `├─────────────────────────────────────────────────────────────────────┤`,
-    `│ App: com.example.app  [DEBUG]  │  CPU: ${m.cpuCores} cores  │  Mem: ${m.memTotal} GB total  │`,
-    `├─────────────────────────────────────────────────────────────────────┤`,
+    `┌────────────────────────────────────────────────────────────┐`,
+    `│ perfmon-tool v${(ver + ' ').padEnd(14)} Device: ${m.device.padEnd(15)} Uptime: ${m.uptime.padEnd(5)} │`,
+    `├────────────────────────────────────────────────────────────┤`,
+    `│ [Dashboard]                                          (q) quit │`,
+    `├────────────────────────────────────────────────────────────┤`,
+    `│ ${('CPU: ' + m.cpuCores + ' cores').padEnd(20)} ${('Mem: ' + m.memTotal + ' GB').padEnd(15)} App: com.example.app [DEBUG] │`,
+    `├────────────────────────────────────────────────────────────┤`,
     `│ CPU Utilization (overall)  ${m.cpuLoad}%`,
-    `│ ┌─────────────────────────────────────────────────────────────────┐ │`,
-    `│ │ ${barStr(m.cpuLoad)} ${String(m.cpuLoad).padStart(3)}% │ │`,
-    `│ └─────────────────────────────────────────────────────────────────┘ │`,
+    `│ ${lineChartStr(m.cpuLoad)} ${String(m.cpuLoad).padStart(3)}%`,
     `│`,
     `│ Memory (Total: ${m.memTotal} GB)  ${m.memUsed.toFixed(1)} GB used`,
-    `│ ┌─────────────────────────────────────────────────────────────────┐ │`,
-    `│ │ Used:  ${barStr(memPct)} ${String(memPct).padStart(3)}% │ │`,
-    `│ │ Cache: ${barStr(cachePct)} ${String(cachePct).padStart(3)}% │ │`,
-    `│ └─────────────────────────────────────────────────────────────────┘ │`,
+    `│ ${lineChartStr(Math.round(m.memUsed / parseFloat(m.memTotal) * 100))} ${Math.round(m.memUsed / parseFloat(m.memTotal) * 100)}%`,
     `│`,
-    `│ Threads: ${m.threads}  │  Peak CPU: ${m.cpuLoad + 12}%  │  Peak RAM: ${(m.memUsed + 0.5).toFixed(1)} GB  │  Samples: 300`,
-    `├─────────────────────────────────────────────────────────────────────┤`,
-    `│ [↑/↓] Navigate  [TAB] Switch  [e] Export  [?] Help  [q] Quit        │`,
-    `└─────────────────────────────────────────────────────────────────────┘`,
+    `│ Threads: ${m.threads}  │  Peak CPU: ${m.cpuLoad + 12}%  │  Peak RAM: ${(m.memUsed + 0.5).toFixed(1)} GB`,
+    `├────────────────────────────────────────────────────────────┤`,
+    `│ [↑/↓] Scroll  [TAB] Switch  [e] Export  [?] Help  [q] Quit  │`,
+    `├────────────────────────────────────────────────────────────┤`,
+    `│ INFO  System ready  |  INFO  Polling every 1s  |  OK  12 samples │`,
+    `└────────────────────────────────────────────────────────────┘`,
   ]
 
   return (
@@ -232,7 +234,7 @@ function LiveTerminal({ mouse }) {
         </div>
         <div className="terminal-body">
           {lines.map((l, i) => (
-            <div key={i} className={`line ${i >= 6 && i <= 9 ? 'cyan' : i >= 11 && i <= 15 ? 'magenta' : i === 17 ? 'amber' : 'dim'}`}>
+            <div key={i} className={`line ${i >= 6 && i <= 8 ? 'cyan' : i >= 9 && i <= 11 ? 'magenta' : i === 13 ? 'amber' : i >= 15 ? 'dim' : 'dim'}`}>
               {l}
             </div>
           ))}
