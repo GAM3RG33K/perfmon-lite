@@ -60,32 +60,60 @@ function useDeviceInfo() {
 
 function useLiveMetrics(deviceName) {
   const totalMem = navigator.deviceMemory || 8
-  const [metrics, setMetrics] = useState(() => ({
-    device: deviceName,
-    cpuCores: navigator.hardwareConcurrency || 4,
-    cpuLoad: 34,
-    memUsed: totalMem * 0.4,
-    memTotal: totalMem.toString(),
-    threads: 42,
-    uptime: '0:00',
-  }))
+  const isChrome = typeof performance?.memory?.usedJSHeapSize === 'number'
+
+  const [metrics, setMetrics] = useState(() => {
+    let initialMem = totalMem * 0.45
+    if (isChrome) {
+      // Real JS heap ratio scaled to total RAM
+      const heapRatio = performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit
+      initialMem = Math.round(totalMem * heapRatio * 100) / 100
+      if (initialMem < 0.5 || initialMem > totalMem * 0.9) initialMem = totalMem * 0.45
+    }
+    return {
+      device: deviceName,
+      cpuCores: navigator.hardwareConcurrency || 4,
+      cpuLoad: 28,
+      memUsed: initialMem,
+      memTotal: totalMem.toString(),
+      threads: 42,
+      uptime: '0:00',
+    }
+  })
 
   useEffect(() => {
     const total = parseFloat(totalMem.toString())
+    let prevLoad = 28
+    let prevMem = 0
+
     const tick = () => {
-      const load = Math.floor(Math.random() * 40 + 15)
-      const mem = total * (0.25 + Math.random() * 0.45)
+      // Smooth CPU: drift slowly ±3% per tick, cap at 5-80%
+      prevLoad += (Math.random() - 0.5) * 6
+      prevLoad = Math.max(5, Math.min(80, prevLoad))
+      const load = Math.round(prevLoad)
+
+      // Smooth memory: very slow drift ±2% of total per tick
+      if (isChrome) {
+        // Real JS heap data
+        const heapRatio = performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit
+        const target = total * heapRatio
+        prevMem = prevMem === 0 ? target : prevMem + (target - prevMem) * 0.1
+      } else {
+        prevMem === 0 ? prevMem = total * 0.45 : prevMem += (Math.random() - 0.5) * total * 0.02
+        prevMem = Math.max(total * 0.2, Math.min(total * 0.85, prevMem))
+      }
+
       setMetrics(prev => ({
         ...prev,
         cpuLoad: load,
-        memUsed: mem,
-        threads: Math.floor(35 + Math.random() * 20),
+        memUsed: Math.round(prevMem * 100) / 100,
+        threads: Math.floor(38 + Math.sin(Date.now() / 5000) * 4),
       }))
     }
-    const t = setInterval(tick, 1000)
     tick()
+    const t = setInterval(tick, 2000)
     return () => clearInterval(t)
-  }, [])
+  }, [isChrome, totalMem])
 
   return metrics
 }
