@@ -153,6 +153,9 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "ctrl+c":
 		m.Quitting = true
 		m.Logs.AddEntry("INFO", "Shutting down...")
+		if path, err := m.exportLogs(); err == nil {
+			m.Logs.AddEntry("INFO", fmt.Sprintf("Logs saved to %s", path))
+		}
 		m.Engine.Close()
 		return m, tea.Quit
 
@@ -175,17 +178,6 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		m.setStatus("⟳ Refreshing...")
 		m.Logs.AddEntry("INFO", "Refreshing...")
-		return m, nil
-
-	case "l":
-		path, err := m.exportLogs()
-		if err != nil {
-			m.Logs.AddEntry("ERROR", fmt.Sprintf("Log export failed: %v", err))
-			m.setStatus(styles.ErrorStyle.Render("✗ Log export failed"))
-		} else {
-			m.Logs.AddEntry("INFO", fmt.Sprintf("Logs exported to %s", path))
-			m.setStatus(fmt.Sprintf("✓ Logs exported to %s", path))
-		}
 		return m, nil
 
 	case "e":
@@ -422,7 +414,7 @@ func (m *Model) renderTabs() string {
 
 func (m *Model) renderFooter() string {
 	hints := []string{
-		"[↑/↓] Scroll", "[TAB] Switch", "[e] Export", "[l] Logs",
+		"[↑/↓] Scroll", "[TAB] Switch", "[e] Export",
 		"[r] Refresh", "[?] Help", "[q] Quit",
 	}
 	footerWidth := m.Width - 2
@@ -451,7 +443,6 @@ func (m *Model) renderHelp() string {
 			{"e", "Open export format picker"},
 			{"Shift+E", "Export directly to Markdown"},
 			{"Ctrl+E", "Export directly to HTML"},
-			{"l", "Export system logs"},
 			{"r", "Refresh device list"},
 		}},
 		{"General", [][2]string{
