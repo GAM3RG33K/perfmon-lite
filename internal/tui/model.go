@@ -324,6 +324,55 @@ func (m *Model) View() string {
 		return m.renderFormatPicker()
 	}
 
+	return m.renderMainView()
+}
+
+// renderFormatPicker shows a small centered modal for selecting export format.
+func (m *Model) renderFormatPicker() string {
+	// Render the normal view first, then overlay a modal on top
+	baseView := m.renderMainView()
+
+	// Build a small floating modal
+	var modal strings.Builder
+	modal.WriteString("\n")
+	title := styles.HighlightStyle.Render("  Select export format")
+	modal.WriteString(title)
+	modal.WriteString("\n\n")
+	for i, label := range pickerLabels {
+		if i == m.formatPickerIdx {
+			modal.WriteString(styles.HighlightStyle.Render("  ▸ " + label))
+		} else {
+			modal.WriteString(styles.LabelStyle.Render("    " + label))
+		}
+		modal.WriteString("\n")
+	}
+	modal.WriteString("\n")
+	modal.WriteString(styles.HelpFooter.Render("  ↑/↓  Enter  Esc"))
+
+	// Insert the modal into the center of the view
+	lines := strings.Split(baseView, "\n")
+	modalLines := strings.Split(strings.TrimRight(modal.String(), "\n"), "\n")
+	startY := len(lines)/2 - len(modalLines)/2
+	if startY < 0 {
+		startY = 0
+	}
+
+	var result strings.Builder
+	for i, line := range lines {
+		if i >= startY && i < startY+len(modalLines) {
+			idx := i - startY
+			result.WriteString(modalLines[idx])
+			result.WriteString("\n")
+		} else {
+			result.WriteString(line)
+			result.WriteString("\n")
+		}
+	}
+	return result.String()
+}
+
+// renderMainView renders the TUI content without the format picker overlay.
+func (m *Model) renderMainView() string {
 	var b strings.Builder
 
 	// Title bar
@@ -382,35 +431,6 @@ func (m *Model) View() string {
 	// Footer
 	b.WriteString(m.renderFooter())
 
-	return b.String()
-}
-
-// renderFormatPicker shows a modal overlay for selecting export format.
-func (m *Model) renderFormatPicker() string {
-	var b strings.Builder
-	b.WriteString("\n\n\n")
-	b.WriteString(styles.HelpTitle.Render("  Select export format"))
-	b.WriteString("\n\n")
-
-	for i, label := range pickerLabels {
-		prefix := "  "
-		cursor := " "
-		if i == m.formatPickerIdx {
-			prefix = "▸ "
-			cursor = "▸"
-			_ = cursor
-		}
-		line := prefix + label
-		if i == m.formatPickerIdx {
-			b.WriteString(styles.HighlightStyle.Render(line))
-		} else {
-			b.WriteString(styles.LabelStyle.Render(line))
-		}
-		b.WriteString("\n")
-	}
-
-	b.WriteString("\n")
-	b.WriteString(styles.HelpFooter.Render("  ↑/↓ navigate  Enter select  Esc cancel"))
 	return b.String()
 }
 
