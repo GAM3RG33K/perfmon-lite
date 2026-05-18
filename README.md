@@ -2,7 +2,7 @@
 
 **Blistering-fast, terminal-based mobile app profiling** — CPU, memory, and thread telemetry for Android and iOS, right in your terminal.
 
-> **v0.0.1 Beta** — First public release. Core profiling features stable. Feedback welcome!
+> **v0.0.2.1 Beta** — App launch detection, line charts, improved TUI. Feedback welcome!
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
