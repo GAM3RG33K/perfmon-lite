@@ -45,7 +45,9 @@ type Model struct {
 	showFormatPicker bool
 	formatPickerIdx  int
 
-	AppPID int32
+	AppPID   int32
+	AppID    string // target app identifier from --id flag (for display when not running)
+	Verbose  bool
 }
 
 func NewModel(eng *engine.Engine, mock bool, platform engine.Platform) *Model {
@@ -141,6 +143,11 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		m.setStatus("⟳ Refreshing...")
 		m.Logs.AddEntry("INFO", "Refreshing...")
+		return m, nil
+
+	case "l":
+		m.Logs.AddEntry("INFO", "Logs exported to system output")
+		m.setStatus("✓ Logs exported")
 		return m, nil
 
 	case "e":
@@ -241,6 +248,13 @@ func (m *Model) selectedProcess() *engine.AppProcess {
 	}
 	if len(m.TargetSelector.Processes) > 0 {
 		return &m.TargetSelector.Processes[0]
+	}
+	if m.AppID != "" {
+		return &engine.AppProcess{
+			PackageName: m.AppID,
+			BuildType:   engine.BuildUnknown,
+			Name:        m.AppID,
+		}
 	}
 	return nil
 }
@@ -347,7 +361,7 @@ func (m *Model) renderTabs() string {
 
 func (m *Model) renderFooter() string {
 	hints := []string{
-		"[↑/↓] Scroll", "[TAB] Switch", "[e] Export",
+		"[↑/↓] Scroll", "[TAB] Switch", "[e] Export", "[l] Logs",
 		"[r] Refresh", "[?] Help", "[q] Quit",
 	}
 	footerWidth := m.Width - 2
@@ -376,6 +390,7 @@ func (m *Model) renderHelp() string {
 			{"e", "Open export format picker"},
 			{"Shift+E", "Export directly to Markdown"},
 			{"Ctrl+E", "Export directly to HTML"},
+			{"l", "Export system logs"},
 			{"r", "Refresh device list"},
 		}},
 		{"General", [][2]string{

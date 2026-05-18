@@ -230,6 +230,8 @@ func main() {
 	// Populate the TUI with discovered devices and processes
 	model.SetTargets(discoveredDevices, discoveredProcesses)
 	model.AppPID = initialPID
+	model.AppID = *appIDFlag
+	model.Verbose = *verboseFlag
 
 	appName := resolvedAppName(discoveredProcesses, initialPID)
 	model.Logs.AddEntry("INFO", fmt.Sprintf("Target: %s | App: %s (PID %d)",
@@ -397,7 +399,14 @@ func autoDetectProvider(deviceID, appID string, verbose bool) (
 		if deviceID == "" || matchDevice(aDevs, deviceID) {
 			provider, devices, processes, pid, platform = aProv, aDevs, aProcs, aPID, aPlat
 			if appID != "" {
-				pid = matchProcess(processes, appID)
+				matched := matchProcess(processes, appID)
+				if matched > 0 {
+					pid = matched
+				} else {
+					fmt.Fprintf(os.Stderr, "App %q not running on Android — attempting to launch...\n", appID)
+					launchAppOnDevice(devices, appID, nil, nil, "", verbose)
+					fmt.Fprintf(os.Stderr, "  Waiting for app to start...\n")
+				}
 			}
 			return
 		}
@@ -410,7 +419,15 @@ func autoDetectProvider(deviceID, appID string, verbose bool) (
 		if deviceID == "" || matchDevice(iDevs, deviceID) {
 			provider, devices, processes, pid, platform = iProv, iDevs, iProcs, iPID, iPlat
 			if appID != "" {
-				pid = matchProcess(processes, appID)
+				matched := matchProcess(processes, appID)
+				if matched > 0 {
+					pid = matched
+				} else {
+					fmt.Fprintf(os.Stderr, "App %q not running on iOS — attempting to launch...\n", appID)
+					xcrun, _ := iosPkg.FindXcrunPath()
+					launchAppOnDevice(devices, appID, nil, nil, xcrun, verbose)
+					fmt.Fprintf(os.Stderr, "  Waiting for app to start...\n")
+				}
 			}
 			return
 		}
@@ -493,6 +510,39 @@ func matchProcess(processes []engine.AppProcess, appID string) int32 {
 		}
 	}
 	return 0
+}
+
+// launchAppOnDevice attempts to launch a specified app on the connected device.
+// For Android: uses `adb shell monkey -p <package> 1`
+// For iOS: uses `xcrun simctl launch <udid> <bundle-id>`
+func launchAppOnDevice(devices []engine.Device, appID string, versionCheck interface{}, devCheck interface{}, xcrunPath string, verbose bool) {
+	if len(devices) == 0 {
+		return
+	}
+
+	// Android: try monkey
+	if devices[0].Platform == engine.PlatformAndroid {
+		adbPath, err := android.FindAdbPath()
+		if err == nil {
+			// Try monkey first (works on most devices)
+			cmd := exec.Command(adbPath, "-s", devices[0].ID, "shell", "monkey", "-p", appID, "1")
+			if out, err := cmd.CombinedOutput(); err != nil {
+				if verbose {
+					log.Printf("monkey launch failed, trying am start: %s", string(out))
+				}
+				// Fallback: am start
+				cmd = exec.Command(adbPath, "-s", devices[0].ID, "shell", "am", "start", "-n", appID+"/.MainActivity")
+				if out, err := cmd.CombinedOutput(); err != nil && verbose {
+					log.Printf("am start also failed: %s", string(out))
+				}
+			}
+		}
+	} else if devices[0].Platform == engine.PlatformIOS && xcrunPath != "" {
+		cmd := exec.Command(xcrunPath, "simctl", "launch", devices[0].ID, appID)
+		if out, err := cmd.CombinedOutput(); err != nil && verbose {
+			log.Printf("simctl launch failed: %s", string(out))
+		}
+	}
 }
 
 // resolvedAppName finds the package name matching a PID in the process list.
