@@ -34,7 +34,8 @@ const (
 	exitExportError   = 4
 )
 
-var version = "dev" // overridden by -X main.version=$(cat VERSION) at build
+var version = "dev"  // overridden by -X main.version=$(cat VERSION) at build
+var commit = "dev"   // overridden by -X main.commit=$(git rev-parse --short HEAD) at build
 
 func main() {
 	// ── CLI flags ───────────────────────────────────────────────────────
@@ -52,7 +53,7 @@ func main() {
 
 	// Custom usage
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "perfmon v%s — Mobile Performance Monitor & Profiler\n\n", version)
+		fmt.Fprintf(os.Stderr, "perfmon-tool v%s (%s) — Mobile Performance Monitor & Profiler\n\n", version, commit)
 		fmt.Fprintf(os.Stderr, "Usage:\n")
 		fmt.Fprintf(os.Stderr, "  perfmon [flags]\n")
 		fmt.Fprintf(os.Stderr, "  perfmon devices [flags]\n")
@@ -82,7 +83,7 @@ func main() {
 
 	// Handle version flag
 	if *showVersion {
-		fmt.Printf("perfmon v%s\n", version)
+		fmt.Printf("perfmon-tool v%s (%s)\n", version, commit)
 		os.Exit(exitSuccess)
 	}
 

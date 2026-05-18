@@ -3,7 +3,7 @@
 # Removes perfmon binary from common install locations.
 set -euo pipefail
 
-BIN_NAME="perfmon"
+BIN_NAME="perfmon-tool"
 REMOVED=false
 
 echo "Uninstalling perfmon..."

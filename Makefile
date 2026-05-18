@@ -6,13 +6,14 @@ DIST_DIR := dist
 
 # Read version from VERSION file; override with: make build VERSION=1.0.0
 VERSION ?= $(shell cat VERSION 2>/dev/null || echo "dev")
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 build: ## Build the binary
-	go build -o $(APP_NAME) -ldflags="-s -w -X main.version=$(VERSION)" ./cmd/perfmon/
+	go build -o $(APP_NAME) -ldflags="-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)" ./cmd/perfmon/
 
 cross-build: ## Build binaries for all platforms (linux/darwin/windows x amd64/arm64)
 	@mkdir -p $(DIST_DIR)

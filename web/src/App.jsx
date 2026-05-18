@@ -10,48 +10,21 @@ const FEATURES = [
 ]
 
 const COMMANDS = [
-  ['perfmon --mock', 'Try with simulated data'],
-  ['perfmon', 'Auto-detect and profile'],
-  ['perfmon --id com.example.app', 'Target a specific app'],
-  ['perfmon devices', 'List connected devices'],
-  ['perfmon update', 'Self-update to latest'],
+  ['perfmon-tool --mock', 'Try with simulated data'],
+  ['perfmon-tool', 'Auto-detect and profile'],
+  ['perfmon-tool --id com.example.app', 'Target a specific app'],
+  ['perfmon-tool devices', 'List connected devices'],
+  ['perfmon-tool update', 'Self-update to latest'],
 ]
 
-const TYPING_LINES = [
-  { text: '┌─────────────────────────────────────────────────────────────────────┐', cls: 'dim' },
-  { text: '│ perfmon v0.0.1                   Device: Pixel 8        Uptime: 12:34 │', cls: 'dim' },
-  { text: '├─────────────────────────────────────────────────────────────────────┤', cls: 'dim' },
-  { text: '│ [Dashboard]  [Processes]  [System Logs]                          (q) quit │', cls: 'dim' },
-  { text: '├─────────────────────────────────────────────────────────────────────┤', cls: 'dim' },
-  { text: '│ Device: Pixel 8  │  App: com.example.app  [DEBUG]  │  CPU: 8 cores  │', cls: 'dim' },
-  { text: '├─────────────────────────────────────────────────────────────────────┤', cls: 'dim' },
-  { text: '│ CPU Utilization (overall)  78.2%', cls: 'cyan' },
-  { text: '│ ┌─────────────────────────────────────────────────────────────────┐ │', cls: 'dim' },
-  { text: '│ │ ████████████████████████████████████████████████──────────── 78% │ │', cls: 'dim' },
-  { text: '│ └─────────────────────────────────────────────────────────────────┘ │', cls: 'dim' },
-  { text: '│', cls: '' },
-  { text: '│ Memory (Total: 8.0 GB)  312 MB', cls: 'magenta' },
-  { text: '│ ┌─────────────────────────────────────────────────────────────────┐ │', cls: 'dim' },
-  { text: '│ │ Used:  ████████████████████████████████────────────  215 MB     │ │', cls: 'dim' },
-  { text: '│ │ Cache: ██████████████──────────────────────────────   97 MB     │ │', cls: 'dim' },
-  { text: '│ └─────────────────────────────────────────────────────────────────┘ │', cls: 'dim' },
-  { text: '│', cls: '' },
-  { text: '│ Threads: 42  │  Peak CPU: 78.2%  │  Peak RAM: 215 MB  │  Samples: 300', cls: 'amber' },
-  { text: '├─────────────────────────────────────────────────────────────────────┤', cls: 'dim' },
-  { text: '│ [↑/↓] Navigate  [TAB] Switch  [e] Export  [?] Help  [q] Quit        │', cls: 'dim' },
-  { text: '└─────────────────────────────────────────────────────────────────────┘', cls: 'dim' },
-]
-
-/* ─── Hooks ─────────────────────────────────────────────── */
-
-function useTypewriter(lines, speed = 18) {
+function useTypewriter(lines, speed = 12) {
   const [visible, setVisible] = useState([])
   const idxRef = useRef(0)
   const charRef = useRef(0)
   useEffect(() => {
     const t = setInterval(() => {
       if (idxRef.current >= lines.length) { clearInterval(t); return }
-      const line = lines[idxRef.current].text
+      const line = lines[idxRef.current]
       if (charRef.current <= line.length) {
         setVisible(prev => {
           const copy = [...prev]
@@ -89,6 +62,43 @@ function useMousePos() {
   return pos
 }
 
+/* ─── Live metrics hook ────────────────────────────────── */
+
+function useLiveMetrics() {
+  const [metrics, setMetrics] = useState(() => ({
+    cpuCores: navigator.hardwareConcurrency || 4,
+    cpuLoad: 34,
+    memUsed: 3.2,
+    memTotal: (performance.memory ? performance.memory.jsHeapSizeLimit / (1024*1024*1024) : 8).toFixed(1),
+    threads: 42,
+    uptime: '0:00',
+  }))
+
+  useEffect(() => {
+    const tick = () => {
+      const load = Math.floor(Math.random() * 40 + 15)
+      const mem = performance.memory
+        ? (performance.memory.usedJSHeapSize / (1024*1024*1024)).toFixed(1)
+        : (2 + Math.random() * 3).toFixed(1)
+      setMetrics(prev => {
+        const totalMin = parseFloat(prev.memTotal) * 0.3
+        const memVal = Math.max(totalMin, parseFloat(mem) || 0)
+        return {
+          ...prev,
+          cpuLoad: load,
+          memUsed: parseFloat(memVal.toFixed(1)),
+          threads: Math.floor(35 + Math.random() * 20),
+        }
+      })
+    }
+    const t = setInterval(tick, 3000)
+    tick()
+    return () => clearInterval(t)
+  }, [])
+
+  return metrics
+}
+
 /* ─── Components ────────────────────────────────────────── */
 
 function ParallaxSection({ children, speed = 0.3, className = '' }) {
@@ -103,11 +113,7 @@ function ParallaxSection({ children, speed = 0.3, className = '' }) {
     return () => o.disconnect()
   }, [])
   const offset = top ? (scrollY - top) * speed : 0
-  return (
-    <div ref={ref} className={className} style={{ transform: `translateY(${offset}px)` }}>
-      {children}
-    </div>
-  )
+  return <div ref={ref} className={className} style={{ transform: `translateY(${offset}px)` }}>{children}</div>
 }
 
 function Floaters() {
@@ -117,64 +123,18 @@ function Floaters() {
   return (
     <div className="floaters" aria-hidden="true">
       {symbols.map((s, i) => {
-        const baseX = (i % 5) * 20 + 5
-        const baseY = i * 15 + 10
         const driftX = Math.sin(scrollY * 0.001 + i) * 20 + (mouse.x - 0.5) * 40 * (1 + (i % 3) * 0.5)
         const driftY = Math.cos(scrollY * 0.0008 + i * 1.5) * 15
-        const opacity = 0.06 + (i % 3) * 0.03
         return (
-          <span
-            key={i}
-            className="floater"
-            style={{
-              left: `${baseX}%`,
-              top: `${baseY}%`,
-              transform: `translate(${driftX}px, ${driftY}px)`,
-              opacity,
-              fontSize: `${12 + (i % 4) * 4}px`,
-              animationDelay: `${i * 0.3}s`,
-            }}
-          >
-            {s}
-          </span>
+          <span key={i} className="floater" style={{
+            left: `${(i % 5) * 20 + 5}%`,
+            top: `${i * 15 + 10}%`,
+            transform: `translate(${driftX}px, ${driftY}px)`,
+            opacity: 0.06 + (i % 3) * 0.03,
+            fontSize: `${12 + (i % 4) * 4}px`,
+          }}>{s}</span>
         )
       })}
-    </div>
-  )
-}
-
-function Sparkline({ data, color, height = 40 }) {
-  if (!data.length) return null
-  const max = Math.max(...data, 1)
-  const w = data.length * 4
-  const pts = data.map((v, i) => `${i * 4},${height - (v / max) * height}`).join(' ')
-  return (
-    <svg width={w} height={height} style={{ display: 'block' }}>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function AnimatedCPU() {
-  const [vals, setVals] = useState(() => Array.from({ length: 30 }, () => Math.random() * 60 + 10))
-  useEffect(() => { const t = setInterval(() => setVals(prev => [...prev.slice(1), Math.random() * 60 + 10]), 300); return () => clearInterval(t) }, [])
-  return (
-    <div className="live-chart" data-label="CPU">
-      <Sparkline data={vals} color="#00ffff" />
-      <span className="chart-label" style={{ color: '#00ffff' }}>CPU</span>
-      <span className="chart-value">{Math.round(vals[vals.length - 1])}%</span>
-    </div>
-  )
-}
-
-function AnimatedMemory() {
-  const [vals, setVals] = useState(() => Array.from({ length: 30 }, () => Math.random() * 100 + 100))
-  useEffect(() => { const t = setInterval(() => setVals(prev => [...prev.slice(1), Math.random() * 100 + 100]), 400); return () => clearInterval(t) }, [])
-  return (
-    <div className="live-chart" data-label="RAM">
-      <Sparkline data={vals} color="#ff00ff" />
-      <span className="chart-label" style={{ color: '#ff00ff' }}>RAM</span>
-      <span className="chart-value">{Math.round(vals[vals.length - 1])} MB</span>
     </div>
   )
 }
@@ -192,23 +152,82 @@ function ScrollReveal({ children, delay = 0 }) {
   return <div ref={ref} className={`reveal ${visible ? 'revealed' : ''}`}>{children}</div>
 }
 
-/* ─── App ────────────────────────────────────────────────── */
-
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false)
   return (
-    <button
-      className={`copy-btn ${copied ? 'copied' : ''}`}
+    <button className={`copy-btn ${copied ? 'copied' : ''}`}
       onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
-      title="Copy command"
-    >
+      title="Copy command">
       {copied ? '✓' : '⎘'}
     </button>
   )
 }
 
+/* ─── Terminal with live metrics ────────────────────────── */
+
+function Bar({ pct, color }) {
+  const w = Math.max(Math.round(pct / 100 * 44), 1)
+  const bar = '█'.repeat(w) + '─'.repeat(Math.max(44 - w, 0))
+  return <span style={{ color }}>{bar}</span>
+}
+
+function LiveTerminal({ mouse }) {
+  const m = useLiveMetrics()
+  const ver = import.meta.env.VITE_APP_VERSION || 'dev'
+  const memPct = Math.round((m.memUsed / parseFloat(m.memTotal)) * 100)
+  const cachePct = Math.max(Math.round(memPct * 0.3), 2)
+
+  const lines = [
+    `┌─────────────────────────────────────────────────────────────────────┐`,
+    `│ perfmon-tool v${ver.padEnd(14)} Device: Pixel 8            Uptime: ${m.uptime.padEnd(5)} │`,
+    `├─────────────────────────────────────────────────────────────────────┤`,
+    `│ [Dashboard]  [Processes]  [System Logs]                      (q) quit │`,
+    `├─────────────────────────────────────────────────────────────────────┤`,
+    `│ App: com.example.app  [DEBUG]  │  CPU: ${m.cpuCores} cores  │  Mem: ${m.memTotal} GB total  │`,
+    `├─────────────────────────────────────────────────────────────────────┤`,
+    `│ CPU Utilization (overall)  ${m.cpuLoad}%`,
+    `│ ┌─────────────────────────────────────────────────────────────────┐ │`,
+    `│ │ ${Bar({ pct: m.cpuLoad, color: '#0ff' })} ${String(m.cpuLoad).padStart(3)}% │ │`,
+    `│ └─────────────────────────────────────────────────────────────────┘ │`,
+    `│`,
+    `│ Memory (Total: ${m.memTotal} GB)  ${m.memUsed.toFixed(1)} GB used`,
+    `│ ┌─────────────────────────────────────────────────────────────────┐ │`,
+    `│ │ Used:  ${Bar({ pct: memPct, color: '#f0f' })} ${String(memPct).padStart(3)}% │ │`,
+    `│ │ Cache: ${Bar({ pct: cachePct, color: '#0f8' })} ${String(cachePct).padStart(3)}% │ │`,
+    `│ └─────────────────────────────────────────────────────────────────┘ │`,
+    `│`,
+    `│ Threads: ${m.threads}  │  Peak CPU: ${m.cpuLoad + 12}%  │  Peak RAM: ${(m.memUsed + 0.5).toFixed(1)} GB  │  Samples: 300`,
+    `├─────────────────────────────────────────────────────────────────────┤`,
+    `│ [↑/↓] Navigate  [TAB] Switch  [e] Export  [?] Help  [q] Quit        │`,
+    `└─────────────────────────────────────────────────────────────────────┘`,
+  ]
+
+  const typed = useTypewriter(lines, 10)
+
+  return (
+    <section className="terminal-section">
+      <div className="terminal" style={{
+        transform: `rotateX(${(mouse.y - 0.5) * 3}deg) rotateY(${(mouse.x - 0.5) * 3}deg)`,
+      }}>
+        <div className="terminal-header">
+          <span className="dot"></span><span className="dot"></span><span className="dot"></span>
+          <span className="terminal-title">perfmon-tool — live</span>
+        </div>
+        <div className="terminal-body">
+          {typed.map((l, i) => (
+            <div key={i} className={`line ${i >= 6 && i <= 9 ? 'cyan' : i >= 11 && i <= 15 ? 'magenta' : i === 17 ? 'amber' : 'dim'}`}>
+              {l}{i < typed.length - 1 ? '' : <span className="cursor">▌</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* ─── App ────────────────────────────────────────────────── */
+
 export default function App() {
-  const lines = useTypewriter(TYPING_LINES, 18)
   const mouse = useMousePos()
   const [installTab, setInstallTab] = useState('unix')
 
@@ -233,45 +252,16 @@ export default function App() {
 
       <div className="terminal-wrapper" style={{ perspective: '800px' }}>
         <ParallaxSection speed={0.06}>
-          <section className="terminal-section">
-            <div
-              className="terminal"
-              style={{
-                transform: `rotateX(${(mouse.y - 0.5) * 3}deg) rotateY(${(mouse.x - 0.5) * 3}deg)`,
-                transition: 'transform 0.1s ease-out',
-              }}
-            >
-              <div className="terminal-header">
-                <span className="dot"></span><span className="dot"></span><span className="dot"></span>
-                <span className="terminal-title">perfmon — live</span>
-              </div>
-              <div className="terminal-body">
-                {lines.map((l, i) => (
-                  <div key={i} className={`line ${TYPING_LINES[i]?.cls || ''}`}>{l}{i < lines.length - 1 ? '' : <span className="cursor">▌</span>}</div>
-                ))}
-              </div>
-            </div>
-          </section>
+          <LiveTerminal mouse={mouse} />
         </ParallaxSection>
       </div>
-
-      <ParallaxSection speed={-0.04}>
-        <section className="live-section">
-          <ScrollReveal>
-            <div className="live-panel">
-              <AnimatedCPU />
-              <AnimatedMemory />
-            </div>
-          </ScrollReveal>
-        </section>
-      </ParallaxSection>
 
       <section className="features-section">
         <ScrollReveal><h2 className="section-title">Why perfmon?</h2></ScrollReveal>
         <div className="features-grid">
           {FEATURES.map((f, i) => (
             <ScrollReveal key={f.title} delay={i * 80}>
-              <div className="card" style={{ transform: `translateY(${Math.sin(i * 1.2) * 4}px)` }}>
+              <div className="card">
                 <span className="card-icon">{f.icon}</span>
                 <h3>{f.title}</h3>
                 <p>{f.desc}</p>
@@ -290,9 +280,7 @@ export default function App() {
                 <span className={`install-tab ${installTab === 'unix' ? 'active' : ''}`} onClick={() => setInstallTab('unix')}>macOS / Linux</span>
                 <span className={`install-tab ${installTab === 'win' ? 'active' : ''}`} onClick={() => setInstallTab('win')}>Windows</span>
               </div>
-              <div className="code-wrap" style={{
-                transform: `perspective(400px) rotateX(${(mouse.y - 0.5) * 2}deg)`,
-              }}>
+              <div className="code-wrap" style={{ transform: `perspective(400px) rotateX(${(mouse.y - 0.5) * 2}deg)` }}>
                 <div className="code-block">
                   {installTab === 'unix' ? (
                     <><span className="comment"># macOS / Linux</span>
@@ -304,8 +292,7 @@ export default function App() {
                 </div>
                 <CopyButton text={installTab === 'unix'
                   ? 'curl -sfL https://get.perfmon.qzz.io | bash'
-                  : 'iwr https://get.perfmon.qzz.io/windows -useb | iex'
-                } />
+                  : 'iwr https://get.perfmon.qzz.io/windows -useb | iex'} />
               </div>
             </div>
           </ScrollReveal>
@@ -316,7 +303,7 @@ export default function App() {
         <ScrollReveal>
           <h2 className="section-title">Manual Download</h2>
           <div className="download-box">
-            <p className="download-desc">If the one-liner doesn't work, download the binary directly from <a href="https://github.com/GAM3RG33K/perfmon-lite/releases">GitHub Releases</a>.</p>
+            <p className="download-desc">Download the latest binary from <a href="https://github.com/GAM3RG33K/perfmon-lite/releases">GitHub Releases</a>.</p>
             <table className="dl-table">
               <thead><tr><th>Platform</th><th>File</th></tr></thead>
               <tbody>
@@ -328,18 +315,6 @@ export default function App() {
                 <tr><td>Windows (ARM64)</td><td><code>perfmon-tool-{import.meta.env.VITE_APP_VERSION || 'dev'}-windows-arm64.exe</code></td></tr>
               </tbody>
             </table>
-            <div className="manual-steps">
-              <p><strong>macOS / Linux:</strong></p>
-              <div className="code-block" style={{ marginTop: 4 }}>
-                <span className="comment"># after downloading</span>
-                <br /><span className="prompt">$</span> chmod +x perfmon-tool-* &amp;&amp; sudo mv perfmon-tool-* /usr/local/bin/perfmon-tool
-              </div>
-              <p style={{ marginTop: 12 }}><strong>Windows:</strong></p>
-              <div className="code-block" style={{ marginTop: 4 }}>
-                <span className="comment"># PowerShell (as admin)</span>
-                <br /><span className="prompt">PS&gt;</span> mkdir $env:LOCALAPPDATA\perfmon -Force; move .\perfmon-tool-*.exe $env:LOCALAPPDATA\perfmon\perfmon-tool.exe
-              </div>
-            </div>
           </div>
         </ScrollReveal>
       </section>
@@ -360,14 +335,13 @@ export default function App() {
         <ScrollReveal>
           <h2 className="section-title">Usage</h2>
           <div className="usage-box">
-            <p>See the <a href="https://github.com/GAM3RG33K/perfmon-lite/blob/main/USAGE.md">full usage guide</a> on GitHub for detailed documentation, including:</p>
+            <p>See the <a href="https://github.com/GAM3RG33K/perfmon-lite/blob/main/USAGE.md">full usage guide</a> on GitHub.</p>
             <ul className="usage-list">
               <li>Interactive TUI keybindings and navigation</li>
               <li>Exporting telemetry to JSON, Markdown, and HTML</li>
-              <li>Targeting specific devices and apps with <code>--device</code> and <code>--id</code></li>
+              <li>Targeting devices and apps with <code>--device</code> and <code>--id</code></li>
               <li>Environment variables for configuration</li>
-              <li>Platform-specific prerequisites (ADB, Xcode)</li>
-              <li>Troubleshooting and exit codes</li>
+              <li>Platform prerequisites and troubleshooting</li>
             </ul>
           </div>
         </ScrollReveal>

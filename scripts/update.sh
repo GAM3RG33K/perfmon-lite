@@ -8,7 +8,7 @@
 set -euo pipefail
 
 REPO="GAM3RG33K/perfmon-lite"
-BIN_NAME="perfmon"
+BIN_NAME="perfmon-tool"
 
 # ── Locate installed binary ────────────────────────────────────────────
 BIN_PATH="$(command -v "$BIN_NAME" 2>/dev/null || true)"
