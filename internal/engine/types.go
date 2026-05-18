@@ -43,6 +43,7 @@ type TelemetrySnapshot struct {
 	CPUPercent float64 `json:"cpu"`
 	MemoryKB   int64   `json:"memory_kb"`
 	Threads    int32   `json:"threads"`
+	Stack      string  `json:"stack,omitempty"` // stack trace when CPU > threshold
 }
 
 // NewTelemetrySnapshot creates a new telemetry snapshot with the current time.

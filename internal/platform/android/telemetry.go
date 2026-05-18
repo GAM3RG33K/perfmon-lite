@@ -9,6 +9,9 @@ import (
 	"github.com/w1n/perfmon/internal/engine"
 )
 
+// cpuStackThreshold — fetch stack trace when CPU exceeds this %
+const cpuStackThreshold = 50.0
+
 // clkTick is the standard Linux clock tick rate used by Android.
 // Almost all Android devices use 100 ticks/sec.
 const clkTick = 100
@@ -86,7 +89,36 @@ func (p *ADBProvider) Sample(pid int32) (*engine.TelemetrySnapshot, error) {
 	}
 
 	snapshot := engine.NewTelemetrySnapshot(cpuPercent, memKB, threads)
+
+	// Fetch stack trace when CPU usage is significant
+	if cpuPercent > cpuStackThreshold {
+		snapshot.Stack = p.readProcStack(pid)
+	}
+
 	return &snapshot, nil
+}
+
+// readProcStack reads /proc/<pid>/stack via the persistent ADB shell.
+func (p *ADBProvider) readProcStack(pid int32) string {
+	cmd := fmt.Sprintf("cat /proc/%d/stack 2>/dev/null; echo '===END==='", pid)
+	var out string
+	var err error
+
+	err = p.ensureShell()
+	if err == nil {
+		out, err = p.execInShell(cmd)
+	}
+	if err != nil {
+		out, err = p.adbExec("-s", p.DeviceID, "shell", cmd)
+		if err != nil {
+			return ""
+		}
+	}
+	// Trim after the end marker
+	if idx := strings.Index(out, "===END==="); idx >= 0 {
+		out = out[:idx]
+	}
+	return strings.TrimSpace(out)
 }
 
 // parseCPUStat extracts CPU percentage from /proc/<pid>/stat using

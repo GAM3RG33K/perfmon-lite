@@ -54,6 +54,11 @@ func sampleHostProcess(pid int32) (*engine.TelemetrySnapshot, error) {
 	if snapshot == nil {
 		return nil, fmt.Errorf("failed to parse telemetry for PID %d", pid)
 	}
+
+	if snapshot.CPUPercent > 50 {
+		snapshot.Stack = readMacOSStack(pid)
+	}
+
 	return snapshot, nil
 }
 
@@ -99,6 +104,22 @@ func parsePSSample(output string, pid int32) *engine.TelemetrySnapshot {
 	}
 
 	// Thread count via ps -M is unreliable on macOS; leave as 0 for now.
-	snapshot := engine.NewTelemetrySnapshot(cpuPercent, memKB, threads)
-	return &snapshot
+	s := engine.NewTelemetrySnapshot(cpuPercent, memKB, threads)
+	return &s
+}
+
+// readMacOSStack uses the macOS `sample` command to get a brief stack trace.
+// sample is built into macOS and gives detailed user-space stacks.
+func readMacOSStack(pid int32) string {
+	cmd := exec.Command("sample", "-file", "/dev/stdout", strconv.FormatInt(int64(pid), 10), "1", "-mayDie")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	// Take first ~20 lines to keep it concise
+	lines := strings.SplitN(string(out), "\n", 22)
+	if len(lines) > 21 {
+		return strings.Join(lines[:21], "\n") + "\n..."
+	}
+	return string(out)
 }

@@ -213,6 +213,29 @@ func (m *Model) handleTelemetry(msg engine.TelemetryMsg) (tea.Model, tea.Cmd) {
 		m.Logs.AddEntry("ERROR", msg.Error.Error())
 		return m, nil
 	}
+
+	s := msg.Snapshot
+	// Log each tick's CPU/RAM to system logs
+	m.Logs.AddEntry("TICK",
+		fmt.Sprintf("CPU=%.1f%% Mem=%dKB Threads=%d", s.CPUPercent, s.MemoryKB, s.Threads))
+
+	// High CPU alert
+	if s.CPUPercent > 70 {
+		m.Logs.AddEntry("ALERT",
+			fmt.Sprintf("High CPU: %.1f%% (threshold: 70%%)", s.CPUPercent))
+		if s.Stack != "" {
+			m.Logs.AddEntry("STACK",
+				fmt.Sprintf("Stack for PID %d:\n%s", m.AppPID, s.Stack))
+		}
+	}
+
+	// High memory alert
+	memMB := float64(s.MemoryKB) / 1024
+	if memMB > 500 {
+		m.Logs.AddEntry("ALERT",
+			fmt.Sprintf("High RAM: %.0f MB (threshold: 500 MB)", memMB))
+	}
+
 	if m.statusMsg != "" && time.Since(m.statusTime) > 3*time.Second {
 		m.statusMsg = ""
 	}
