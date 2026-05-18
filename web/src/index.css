@@ -322,6 +322,64 @@ body {
 .install-note { margin-top: 16px; font-size: 13px; color: var(--dim); }
 .install-note code { color: var(--cyan); font-family: 'SF Mono', monospace; font-size: 12px; }
 
+/* ─── Manual Download ────────────────────────────────────── */
+
+.download-section {
+  position: relative; z-index: 1;
+  max-width: 700px; margin: 0 auto; padding: 0 24px 60px;
+}
+
+.download-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 32px;
+}
+
+.download-desc { font-size: 14px; color: var(--dim); margin-bottom: 20px; }
+.download-desc a { color: var(--cyan); }
+
+.dl-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
+.dl-table th {
+  text-align: left; padding: 8px 16px; color: var(--dim);
+  font-weight: 500; border-bottom: 1px solid var(--border);
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+}
+.dl-table td { padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.dl-table code { font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: 11px; color: var(--cyan); word-break: break-all; }
+
+.manual-steps { font-size: 13px; }
+.manual-steps p { color: var(--fg); margin-bottom: 4px; }
+.manual-steps .code-block { margin-top: 4px; font-size: 12px; }
+
+/* ─── Usage ──────────────────────────────────────────────── */
+
+.usage-section {
+  position: relative; z-index: 1;
+  max-width: 700px; margin: 0 auto; padding: 0 24px 60px;
+}
+
+.usage-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 32px; font-size: 14px;
+}
+
+.usage-box a { color: var(--cyan); }
+
+.usage-list {
+  list-style: none; margin-top: 16px;
+}
+
+.usage-list li {
+  padding: 6px 0; padding-left: 20px; position: relative;
+  color: var(--dim); font-size: 13px;
+}
+
+.usage-list li::before {
+  content: '▸'; position: absolute; left: 0;
+  color: var(--cyan); font-weight: 700;
+}
+
+.usage-list li code { color: var(--cyan); font-family: 'SF Mono', monospace; font-size: 12px; }
+
 /* ─── Commands ───────────────────────────────────────────── */
 
 .commands-section {

@@ -306,6 +306,37 @@ export default function App() {
         </section>
       </ParallaxSection>
 
+      <section className="download-section">
+        <ScrollReveal>
+          <h2 className="section-title">Manual Download</h2>
+          <div className="download-box">
+            <p className="download-desc">If the one-liner doesn't work, download the binary directly from <a href="https://github.com/GAM3RG33K/perfmon-lite/releases">GitHub Releases</a>.</p>
+            <table className="dl-table">
+              <thead><tr><th>Platform</th><th>File</th></tr></thead>
+              <tbody>
+                <tr><td>macOS (Intel & Apple Silicon)</td><td><code>perfmon-tool-{import.meta.env.VITE_APP_VERSION || 'dev'}-darwin-universal</code></td></tr>
+                <tr><td>Linux (x86_64)</td><td><code>perfmon-tool-{import.meta.env.VITE_APP_VERSION || 'dev'}-linux-amd64</code></td></tr>
+                <tr><td>Linux (ARM64)</td><td><code>perfmon-tool-{import.meta.env.VITE_APP_VERSION || 'dev'}-linux-arm64</code></td></tr>
+                <tr><td>Windows (x86_64)</td><td><code>perfmon-tool-{import.meta.env.VITE_APP_VERSION || 'dev'}-windows-amd64.exe</code></td></tr>
+                <tr><td>Windows (ARM64)</td><td><code>perfmon-tool-{import.meta.env.VITE_APP_VERSION || 'dev'}-windows-arm64.exe</code></td></tr>
+              </tbody>
+            </table>
+            <div className="manual-steps">
+              <p><strong>macOS / Linux:</strong></p>
+              <div className="code-block" style={{ marginTop: 4 }}>
+                <span className="comment"># after downloading</span>
+                <br /><span className="prompt">$</span> chmod +x perfmon-tool-* &amp;&amp; sudo mv perfmon-tool-* /usr/local/bin/perfmon-tool
+              </div>
+              <p style={{ marginTop: 12 }}><strong>Windows:</strong></p>
+              <div className="code-block" style={{ marginTop: 4 }}>
+                <span className="comment"># PowerShell (as admin)</span>
+                <br /><span className="prompt">PS&gt;</span> mkdir $env:LOCALAPPDATA\perfmon -Force; move .\perfmon-tool-*.exe $env:LOCALAPPDATA\perfmon\perfmon-tool.exe
+              </div>
+            </div>
+          </div>
+        </ScrollReveal>
+      </section>
+
       <section className="commands-section">
         <ScrollReveal><h2 className="section-title">Quick Start</h2></ScrollReveal>
         <table className="cmd-table">
@@ -316,6 +347,23 @@ export default function App() {
             ))}
           </tbody>
         </table>
+      </section>
+
+      <section className="usage-section">
+        <ScrollReveal>
+          <h2 className="section-title">Usage</h2>
+          <div className="usage-box">
+            <p>See the <a href="https://github.com/GAM3RG33K/perfmon-lite/blob/main/USAGE.md">full usage guide</a> on GitHub for detailed documentation, including:</p>
+            <ul className="usage-list">
+              <li>Interactive TUI keybindings and navigation</li>
+              <li>Exporting telemetry to JSON, Markdown, and HTML</li>
+              <li>Targeting specific devices and apps with <code>--device</code> and <code>--id</code></li>
+              <li>Environment variables for configuration</li>
+              <li>Platform-specific prerequisites (ADB, Xcode)</li>
+              <li>Troubleshooting and exit codes</li>
+            </ul>
+          </div>
+        </ScrollReveal>
       </section>
 
       <footer className="footer">
