@@ -64,7 +64,7 @@ function useLiveMetrics(deviceName) {
     device: deviceName,
     cpuCores: navigator.hardwareConcurrency || 4,
     cpuLoad: 34,
-    memUsed: (totalMem * 0.4).toFixed(1),
+    memUsed: totalMem * 0.4,
     memTotal: totalMem.toString(),
     threads: 42,
     uptime: '0:00',
@@ -74,7 +74,7 @@ function useLiveMetrics(deviceName) {
     const total = parseFloat(totalMem.toString())
     const tick = () => {
       const load = Math.floor(Math.random() * 40 + 15)
-      const mem = parseFloat((total * (0.25 + Math.random() * 0.45)).toFixed(1))
+      const mem = total * (0.25 + Math.random() * 0.45)
       setMetrics(prev => ({
         ...prev,
         cpuLoad: load,
