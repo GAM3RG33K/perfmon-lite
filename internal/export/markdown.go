@@ -1,6 +1,7 @@
 package export
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"text/template"
@@ -9,9 +10,14 @@ import (
 	"github.com/w1n/perfmon/internal/engine"
 )
 
+//go:embed templates/logo.txt
+var asciiLogo string
+
 // markdownTemplate is the embedded Markdown report template.
 // Code blocks use indentation (4 spaces) to avoid backtick issues in raw strings.
-const markdownTemplate = `# perfmon Telemetry Report
+const markdownTemplate = `{{ .AsciiLogo }}
+
+# perfmon Telemetry Report
 
 **Generated:** {{ .Metadata.GeneratedAt }}
 **Tool Version:** {{ .Metadata.PerfmonVersion }}
@@ -73,23 +79,6 @@ const markdownTemplate = `# perfmon Telemetry Report
 ` + "```" + `
 {{- end }}
 
-## Logo
-
-` + "```" + `
-    █████╗  ██████╗ ███████╗ ██████╗ ███╗   ███╗ ██████╗ ███╗   ██╗
-   ██╔══██╗██╔════╝ ██╔════╝██╔═══██╗████╗ ████║██╔═══██╗████╗  ██║
-   ███████║██║  ███╗█████╗  ██║   ██║██╔████╔██║██║   ██║██╔██╗ ██║
-   ██╔══██║██║   ██║██╔══╝  ██║   ██║██║╚██╔╝██║██║   ██║██║╚██╗██║
-   ██║  ██║╚██████╔╝██║     ╚██████╔╝██║ ╚═╝ ██║╚██████╔╝██║ ╚████║
-   ╚═╝  ╚═╝ ╚═════╝ ╚═╝      ╚═════╝ ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝
-   ████████╗ ██████╗  ██████╗ ██╗
-   ╚══██╔══╝██╔═══██╗██╔═══██╗██║
-      ██║   ██║   ██║██║   ██║██║
-      ██║   ██║   ██║██║   ██║██║
-      ██║   ╚██████╔╝╚██████╔╝███████╗
-      ╚═╝    ╚═════╝  ╚═════╝ ╚══════╝
-` + "```" + `
-
 ### Stack Traces
 
 Samples with significant CPU usage (>50%) include kernel or user-space stack traces:
@@ -115,6 +104,7 @@ type mdRenderer struct {
 	ExportData
 	CPUSparkline string
 	MemSparkline string
+	AsciiLogo    string
 }
 
 // ExportMarkdown writes the export data as a Markdown file.
@@ -159,6 +149,7 @@ func ExportMarkdown(data ExportData, snapshots []engine.TelemetrySnapshot, opts 
 		ExportData:   data,
 		CPUSparkline: cpuSpark,
 		MemSparkline: memSpark,
+		AsciiLogo:    asciiLogo,
 	}
 
 	if err := tmpl.Execute(f, renderer); err != nil {
