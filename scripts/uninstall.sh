@@ -1,27 +1,32 @@
 #!/bin/bash
 # perfmon — uninstall.sh
-# Removes perfmon binary from common install locations.
+# Removes perfmon-tool binary from common install locations.
 set -euo pipefail
 
-BIN_NAME="perfmon-tool"
 REMOVED=false
 
-echo "Uninstalling perfmon..."
+echo "Uninstalling perfmon-tool..."
 
-# Common locations
+# Common locations — check both old name (perfmon) and new name (perfmon-tool)
 for dir in /usr/local/bin "${HOME}/.local/bin"; do
-  path="${dir}/${BIN_NAME}"
-  if [ -f "$path" ]; then
-    rm -f "$path"
-    echo "  Removed ${path}"
-    REMOVED=true
-  fi
+  for bin in perfmon-tool perfmon; do
+    path="${dir}/${bin}"
+    if [ -f "$path" ]; then
+      rm -f "$path"
+      echo "  Removed ${path}"
+      REMOVED=true
+    fi
+  done
 done
 
 if [ "$REMOVED" = false ]; then
-  echo "  perfmon not found in common locations."
-  echo "  You may have installed it in a custom path — delete it manually."
-  exit 0
+  echo "  perfmon-tool not found in common locations."
 fi
 
-echo "  perfmon uninstalled successfully!"
+echo ""
+echo "  ─────────────────────────────────────"
+echo "  Goodbye! Thanks for trying perfmon-tool."
+echo ""
+echo "  To reinstall:"
+echo "    curl -sfL https://get.perfmon.qzz.io | bash"
+echo "  ─────────────────────────────────────"

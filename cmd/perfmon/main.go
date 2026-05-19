@@ -604,7 +604,9 @@ func runUninstall() {
 	// Common install locations
 	paths := []string{
 		"/usr/local/bin/perfmon",
+		"/usr/local/bin/perfmon-tool",
 		filepath.Join(os.Getenv("HOME"), ".local", "bin", "perfmon"),
+		filepath.Join(os.Getenv("HOME"), ".local", "bin", "perfmon-tool"),
 	}
 	found := false
 	for _, p := range paths {
@@ -628,17 +630,24 @@ func runUninstall() {
 				fmt.Printf("  Removed %s\n", winPath)
 				found = true
 			}
-			// Remove the directory too
 			os.Remove(filepath.Dir(winPath))
 		}
 	}
 
 	if !found {
-		fmt.Println("  perfmon not found in common locations.")
-		fmt.Println("  You may have installed it in a custom path — delete it manually.")
-		return
+		fmt.Println("  perfmon-tool not found in common locations.")
+	} else {
+		fmt.Println("  ✓ perfmon-tool uninstalled successfully!")
 	}
-	fmt.Println("  perfmon uninstalled successfully!")
+
+	fmt.Println()
+	fmt.Println("  ─────────────────────────────────────")
+	fmt.Println("  Goodbye! Thanks for trying perfmon-tool.")
+	fmt.Println()
+	fmt.Println("  To reinstall:")
+	fmt.Println("    macOS/Linux: curl -sfL https://get.perfmon.qzz.io | bash")
+	fmt.Println("    Windows:     iwr https://get.perfmon.qzz.io/windows -useb | iex")
+	fmt.Println("  ─────────────────────────────────────")
 }
 
 // runUpdate checks for a newer release on GitHub and replaces the current binary.

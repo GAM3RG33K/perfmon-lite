@@ -1,15 +1,14 @@
 # perfmon — uninstall.ps1
 # Removes perfmon-tool binary from common install locations.
-$BinName = "perfmon-tool.exe"
 $Removed = $false
 
-Write-Host "Uninstalling perfmon..."
+Write-Host "Uninstalling perfmon-tool..."
 
-# Common locations
+# Common locations — check both old (perfmon) and new (perfmon-tool)
 $Paths = @(
-    "$env:LOCALAPPDATA\perfmon\$BinName",
+    "$env:LOCALAPPDATA\perfmon\perfmon-tool.exe",
     "$env:LOCALAPPDATA\perfmon",
-    "${env:ProgramFiles}\perfmon\$BinName"
+    "${env:ProgramFiles}\perfmon\perfmon-tool.exe"
 )
 
 foreach ($p in $Paths) {
@@ -36,9 +35,13 @@ if ($UserPath -and $UserPath.Contains($LocalDir)) {
 }
 
 if (-not $Removed) {
-    Write-Host "  perfmon not found in common locations."
-    Write-Host "  You may have installed it in a custom path — delete it manually."
-    exit 0
+    Write-Host "  perfmon-tool not found in common locations."
 }
 
-Write-Host "  perfmon uninstalled successfully!"
+Write-Host ""
+Write-Host "  ─────────────────────────────────────"
+Write-Host "  Goodbye! Thanks for trying perfmon-tool."
+Write-Host ""
+Write-Host "  To reinstall:"
+Write-Host "    iwr https://get.perfmon.qzz.io/windows -useb | iex"
+Write-Host "  ─────────────────────────────────────"
