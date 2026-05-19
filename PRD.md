@@ -189,7 +189,7 @@ Where $t$ is Timestamp, $C$ is CPU percentage, $M$ is Memory allocated, and $T$ 
 ### Phase 1: Core Scaffolding & Mock Engine (Weeks 1-2)
 
 * Initialize project repo, configure pre-commit hooks, set up GitHub Actions matrix.
-* Build out the underlying Bubble Tea models, custom Lipgloss layout borders, and sparkline view integrations.
+* Build out the underlying Bubble Tea models, custom Lipgloss layout borders, and btop-style block area chart integrations (shared across TUI, exports, and web demo).
 * Implement the `--mock` flag to pipe static sinusoidal curves into the TUI to perfect the dashboard views.
 
 ### Phase 2: Android Subsystem Integration (Weeks 3-4)

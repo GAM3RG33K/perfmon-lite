@@ -2,26 +2,22 @@
 
 **Blistering-fast, terminal-based mobile app profiling** — CPU, memory, and thread telemetry for Android and iOS, right in your terminal.
 
-> **v0.0.5 Beta** — Log capture, stack traces, app detection, auto-export on quit. Feedback welcome!
+> **v0.0.7 Beta** — Unified btop-style area charts in TUI, exports, and landing page. Feedback welcome!
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ perfmon-tool v0.0.1              Device: Pixel 8  Uptime: 12:34 │
+┌─ perfmon-tool v0.0.7 ───────────────────────────────────────┐
+│ Target: Pixel 8  │  App: com.example.app  [DEBUG]          │
 ├─────────────────────────────────────────────────────────────┤
-│ [Dashboard]  [Processes]  [System Logs]              (q) quit │
-├─────────────────────────────────────────────────────────────┤
-│ App: com.example.app  [DEBUG]  │ CPU: 8 cores  │ Temp: 52°C │
-├─────────────────────────────────────────────────────────────┤
-│ CPU Utilization (overall)  78.2%                           │
-│ ┌───────────────────────────────────────────────────────┐ │
-│ │ ████████████████████████████████████████████────── 78% │ │
-│ └───────────────────────────────────────────────────────┘ │
-│ Memory (Total: 8.0 GB)  312 MB                            │
-│ ┌───────────────────────────────────────────────────────┐ │
-│ │ Used:  ████████████████████████████████──────  215 MB │ │
-│ │ Cache: ██████████████────────────────────────  97 MB  │ │
-│ └───────────────────────────────────────────────────────┘ │
-│ Threads: 42  │ Peak CPU: 78%  │ Peak RAM: 215 MB          │
+│ CPU Utilization  78.2%                                      │
+│   100 │▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖  │
+│    50 │▖▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖  │
+│     0 └──────────────────────────────────────────────────  │
+│       100s ago                                    now (%) │
+│ Memory  215 MB                                              │
+│   256 │▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖  │
+│     0 └──────────────────────────────────────────────────  │
+│       100s ago                                    now (MB)  │
+│ Peak CPU: 78%  │  Peak RAM: 215 MB  │  Threads: 42          │
 ├─────────────────────────────────────────────────────────────┤
 │ [↑/↓] Navigate  [TAB] Switch  [e] Export  [?] Help  [q] Quit │
 └─────────────────────────────────────────────────────────────┘
@@ -57,8 +53,8 @@ perfmon-tool --mock --export html --output ./report
 | Persistent shell pipe | ✅ Single `adb shell` connection | N/A (macOS host tools) |
 | **Export formats** | **All platforms** |
 | JSON export | ✅ Structured data (PRD schema v1) |
-| Markdown export | ✅ Report with ASCII tables + charts |
-| HTML export | ✅ Standalone page with SVG vector charts |
+| Markdown export | ✅ Report with btop-style block area charts |
+| HTML export | ✅ Standalone page with embedded chart renderer |
 | PDF export | ✅ Vector line graph report (go-pdf/fpdf) |
 
 ---
@@ -210,6 +206,7 @@ make clean          # Clean build artifacts
 ```
 cmd/perfmon/main.go          # Entry point, CLI flags, TUI boot
 internal/
+├── chart/                   # Shared btop-style block charts (TUI + exports)
 ├── engine/                  # Telemetry engine, ring buffer, domain types
 ├── tui/                     # Bubble Tea TUI (dashboard, target selector, logs)
 ├── platform/
@@ -218,6 +215,7 @@ internal/
 │   └── ios/                 # xcrun-based provider (simctl, devicectl)
 └── export/                  # Export subsystem (JSON, MD, HTML, PDF)
 web/                         # React landing page (GitHub Pages)
+    └── src/tuiChart.js      # JS port of chart renderer for live demo
 scripts/                     # Install/update/uninstall scripts
 ```
 
@@ -229,9 +227,10 @@ scripts/                     # Install/update/uninstall scripts
 | Mock Provider | 15 + 1 benchmark | ✅ |
 | Android Provider | 59 | ✅ |
 | iOS Provider | 34 | ✅ |
+| Chart (shared renderer) | 3 | ✅ |
 | Export Subsystem | 35 | ✅ |
 | ADB Integration | 13 | ✅ (build tag: `adb_test`) |
-| **Total** | **~183** | ✅ All pass with `-race` |
+| **Total** | **~186** | ✅ All pass with `-race` |
 
 ---
 

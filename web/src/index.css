@@ -202,13 +202,22 @@ body {
 
 .terminal-title { color: var(--dim); font-size: 11px; margin-left: 8px; }
 
-.terminal-body { padding: 16px; overflow-x: auto; white-space: pre; min-height: 320px; }
+.terminal-body { padding: 16px; overflow-x: auto; white-space: pre; min-height: 420px; font-size: 12px; line-height: 1.35; }
 .terminal-body .line { white-space: pre; }
 .terminal-body .cyan { color: var(--cyan); }
 .terminal-body .magenta { color: var(--magenta); }
 .terminal-body .green { color: var(--green); }
 .terminal-body .dim { color: #555570; }
 .terminal-body .amber { color: var(--amber); }
+.terminal-body .status { color: var(--green); }
+.terminal-body .tabs { color: var(--cyan); }
+.terminal-body .chart-title { color: #fff; font-weight: 600; }
+.terminal-body .cpu-title { color: #7dd3fc; }
+.terminal-body .mem-title { color: #c4b5fd; }
+.terminal-body .chart-cpu { color: #38bdf8; }
+.terminal-body .chart-mem { color: #a78bfa; }
+.terminal-body .stats { color: #94a3b8; }
+.terminal-body .footer-hint { color: #64748b; }
 .cursor { animation: blink 1s step-end infinite; color: var(--cyan); }
 
 @keyframes blink { 50% { opacity: 0; } }

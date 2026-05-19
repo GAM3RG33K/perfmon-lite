@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/w1n/perfmon/internal/chart"
 	"github.com/w1n/perfmon/internal/engine"
 	"github.com/w1n/perfmon/internal/export"
 	"github.com/w1n/perfmon/internal/tui/styles"
@@ -333,8 +334,6 @@ func (m *Model) runExport(formatType export.Format) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// ─── Main view with bottom log panel ────────────────────────
-
 func (m *Model) renderMainView() string {
 	var b strings.Builder
 
@@ -362,35 +361,44 @@ func (m *Model) renderMainView() string {
 	b.WriteString(styles.LabelStyle.Render(strings.Repeat("─", m.Width-2)))
 	b.WriteString("\n")
 
-	// Tabs
-	b.WriteString(m.renderTabs())
+	tabs := m.renderTabs()
+	b.WriteString(tabs)
 	b.WriteString("\n")
 
-	// Main body area — dashboard on top, logs at bottom
 	bodyWidth := m.Width - 4
 	if bodyWidth < 10 {
 		bodyWidth = 10
 	}
 
-	// Dashboard section (top ~60% of available height)
+	chromeLines := 1 + 1 + views.LineCount(tabs) + 1
+	if len(devices) > 0 && app != nil {
+		chromeLines++
+	}
+	if m.statusMsg != "" {
+		chromeLines++
+	}
+	maxBodyLines := m.Height - chromeLines - 2
+	if maxBodyLines < 6 {
+		maxBodyLines = 6
+	}
+
 	var body string
 	switch m.ActiveTab {
 	case TabDashboard:
+		m.Dashboard.Width = bodyWidth
 		snapshots := m.Engine.Buffer.GetAll()
 		latest := m.Engine.Buffer.Latest()
 		body = m.Dashboard.Render(snapshots, latest)
 	case TabLogs:
+		m.Logs.Width = bodyWidth
+		m.Logs.Height = maxBodyLines - 2
 		body = m.Logs.Render()
+	}
+	if views.LineCount(body) > maxBodyLines {
+		body = views.TruncateLines(body, maxBodyLines)
 	}
 
 	b.WriteString(styles.PanelBorder.Width(bodyWidth).Render(body))
-	b.WriteString("\n")
-
-	// Bottom log panel (always visible as a compact console)
-	b.WriteString(styles.LabelStyle.Render(strings.Repeat("─", m.Width-2)))
-	b.WriteString("\n")
-	logContent := m.Logs.RenderRecent(5)
-	b.WriteString(styles.PanelBorder.Width(bodyWidth).Render(logContent))
 	b.WriteString("\n")
 
 	// Footer
@@ -594,6 +602,17 @@ func (m *Model) exportLogs() (string, error) {
 			return "", fmt.Errorf("writing log file: %w", err)
 		}
 	}
+
+	snapshots := m.Engine.Buffer.GetAll()
+	if len(snapshots) >= 2 {
+		fmt.Fprintln(f, "")
+		fmt.Fprintln(f, strings.Repeat("─", 60))
+		fmt.Fprintln(f, "  Session telemetry charts")
+		fmt.Fprintln(f, strings.Repeat("─", 60))
+		fmt.Fprintln(f, "")
+		fmt.Fprint(f, chart.RenderSessionCharts(snapshots, 70))
+	}
+
 	return path, nil
 }
 

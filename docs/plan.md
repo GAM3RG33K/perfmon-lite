@@ -2,8 +2,8 @@
 
 > **Project:** Performance Monitor & Profiler (Mobile App TUI)
 > **Stack:** Go, Bubble Tea, Lipgloss
-> **Version:** 1.0.0
-> **Last Updated:** 2026-05-13
+> **Version:** 0.0.7
+> **Last Updated:** 2026-05-19
 
 ---
 
@@ -31,7 +31,8 @@
 | 1.3 | `internal/engine/targets.go` — Shared interfaces: `DeviceDiscovery`, `ProcessMapper`, `TelemetryProvider` | ✅ Includes `PlatformProvider` composite interface |
 | 1.4 | `internal/engine/types.go` — Domain types: `Device`, `AppProcess`, `TelemetrySnapshot` | ✅ Plus `MetricsSummary`, `ComputeMetricsSummary()` |
 | 1.5 | `internal/tui/model.go` — Core Bubble Tea model: `Init()`, `Update()`, `View()` with tab support | ✅ 3 tabs, keybindings, resize handling |
-| 1.6 | `internal/tui/views/dashboard.go` — Dashboard view: CPU sparkline, memory chart, thread count, peak stats | ✅ Unicode sparklines with vertical bars |
+| 1.6 | `internal/tui/views/dashboard.go` — Dashboard view: CPU/memory area charts, peak stats | ✅ Btop-style block charts via `internal/chart` |
+| 1.6b | `internal/chart/chart.go` — Shared chart renderer for TUI, exports, and web demo | ✅ Catmull-Rom smoothing, 100-point window, block symbols |
 | 1.7 | `internal/tui/views/target_selector.go` — Target selector view: device list + process list | ✅ Platform/build-type badges |
 | 1.8 | `internal/tui/views/logs.go` — System log view | ✅ Scrollable log viewer |
 | 1.9 | `internal/tui/styles/` — Lipgloss styling: colors (cyan, magenta), badges, borders | ✅ 3 files: colors.go, badges.go, borders.go |
@@ -72,8 +73,8 @@
 |----|------|--------|
 | 4.1 | `internal/export/export.go` — Orchestrator: format dispatcher, `ResolveOutputPath`, `EnsureOutputDir`, `Export` | ✅ Format dispatch + path resolution |
 | 4.2 | `internal/export/json.go` — JSON schema exporter (matching PRD schema) | ✅ `ExportJSON` with metadata + metrics + telemetry |
-| 4.3 | `internal/export/markdown.go` — Markdown template with stats table + ASCII sparklines | ✅ `ExportMarkdown` with summary + telemetry tables |
-| 4.4 | `internal/export/html.go` — Embedded HTML with inline CSS + SVG vector charts (CPU, Memory, Threads) | ✅ `ExportHTML` with SVG polylines, dark theme |
+| 4.3 | `internal/export/markdown.go` — Markdown template with stats table + block area charts | ✅ Uses `chart.RenderCPUChart` / `RenderMemoryChart` |
+| 4.4 | `internal/export/html.go` — Embedded HTML with inline CSS + chart.js renderer | ✅ `templates/chart.js` embedded; matches TUI block charts |
 | 4.5 | `internal/export/pdf.go` — PDF export using `go-pdf/fpdf` with vector line charts | ✅ `ExportPDF` with multi-page vector line graphs |
 | 4.6 | Static asset embedding — `//go:embed` for CSS, styles | ✅ `templates/style.css` embedded in binary |
 | 4.7 | TUI keybindings — `e` for JSON, `Shift+E` for Markdown, `Ctrl+E` for HTML | ✅ Wired into TUI model |

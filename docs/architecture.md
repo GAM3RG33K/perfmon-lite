@@ -10,7 +10,7 @@
 ```
 ┌────────────────────────────────────────────────────────┐
 │                   TUI Presentation Layer               │
-│     (Bubble Tea Model • Lipgloss Styling • Sparklines) │
+│     (Bubble Tea Model • Lipgloss Styling • Area Charts) │
 └───────────────────▲────────────────────────▲───────────┘
      Msg Channel    │                        │ Cmd Exec
 ┌───────────────────┴────────────────────────┴───────────┐
@@ -38,10 +38,16 @@ cmd/
       └── main.go                 # Entry point, CLI flag parsing, TUI boot
 
 internal/
+ ├── chart/
+ │    ├── chart.go                # Shared btop-style block charts (Catmull-Rom smoothing)
+ │    └── chart_test.go           # Chart renderer unit tests
+ │
  ├── tui/
  │    ├── model.go                # Core Bubble Tea state machine
  │    ├── views/
- │    │    ├── dashboard.go       # Main telemetry dashboard
+ │    │    ├── dashboard.go       # Main telemetry dashboard (CPU + memory area charts)
+ │    │    ├── area_chart.go     # Lipgloss-colored chart rendering (wraps internal/chart)
+ │    │    ├── layout.go          # Line count / truncate helpers for responsive layout
  │    │    ├── target_selector.go # Device & process list
  │    │    └── logs.go            # System log viewer
  │    └── styles/
@@ -84,12 +90,17 @@ internal/
       ├── types.go                # ExportData, Options, BuildExportData
       ├── export.go               # Format dispatcher, ResolveOutputPath, EnsureOutputDir
       ├── json.go                 # JSON export (PRD schema v1)
-      ├── markdown.go             # Markdown report with ASCII sparklines + tables
-      ├── html.go                 # HTML report with SVG vector charts (embedded CSS)
+      ├── markdown.go             # Markdown report with block area charts + tables
+      ├── html.go                 # HTML report with embedded chart.js renderer (//go:embed)
       ├── pdf.go                  # PDF report with vector line graphs (go-pdf/fpdf)
       ├── templates/
-      │    └── style.css          # Dark-theme CSS for HTML export (//go:embed)
+      │    ├── style.css          # Dark-theme CSS for HTML export (//go:embed)
+      │    └── chart.js           # Client-side btop-style chart renderer for HTML export
       └── export_test.go          # 35 tests covering all formats
+
+web/
+ └── src/
+      └── tuiChart.js            # JavaScript port of chart renderer for landing-page demo
 ```
 
 ---
@@ -209,25 +220,38 @@ type TelemetryProvider interface {
 
 ---
 
-## 8. TUI Layout
+## 8. Chart Rendering (`internal/chart`)
+
+All visual telemetry charts share one renderer:
+
+| Consumer | Entry point | Notes |
+|----------|-------------|-------|
+| TUI dashboard | `views/renderBtopAreaChart` → `chart.BtopGraphRows` | Lipgloss gradient fill on block symbols |
+| Markdown export | `chart.RenderCPUChart` / `RenderMemoryChart` | Plain-text block charts in report body |
+| HTML export | `templates/chart.js` (embedded) | Same block algorithm in the browser |
+| Landing page | `web/src/tuiChart.js` | Live demo mirrors TUI charts |
+| Log export on quit | `chart.RenderSessionCharts` | Session summary appended to log files |
+
+**Algorithm:** Sample up to 100 snapshots → Catmull-Rom smooth → scale to plot width → btop block symbols (`▗▄▟█` etc.) with optional Y-axis labels and `100s ago … now` time axis.
+
+---
+
+## 9. TUI Layout
 
 ```
-┌─ perfmon v1.0.0 ──────────────────────────────────────────────┐
-│  Target: Pixel 8 (Physical)  │  App: com.example.app [DEBUG]  │
+┌─ perfmon-tool v0.0.7 ─────────────────────────────────────────┐
+│  Target: Pixel 8  │  App: com.example.app [DEBUG]             │
 ├───────────────────────────────────────────────────────────────┤
-│  [ Dashboard ]   Threads/Procs   System Logs                  │
-│                                                               │
-│  CPU Utilization (%)                                          │
-│  78% ┤    ╭╮                                                  │
-│  30% ┤ ╭──╯╰─╮╭──╮                                            │
-│   0% └─╯     ╰╯  ╰──────────────────────────────────────────  │
-│                                                               │
-│  Memory Footprint (MB)                                        │
-│  210 ┤      ╭───────────────────────────────────────────────  │
-│  180 ┤   ╭──╯                                                 │
-│    0 └───╯                                                    │
-│                                                               │
-│  Active Threads: 42  │  Peak RAM: 215 MB  │  Status: Active   │
+│  CPU Utilization  78.2%                                       │
+│    100 │▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖    │
+│     50 │▖▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖    │
+│      0 └──────────────────────────────────────────────────    │
+│        100s ago                                        now (%)  │
+│  Memory  215 MB                                               │
+│    256 │▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖▗▄▟█▟▄▗▖    │
+│      0 └──────────────────────────────────────────────────    │
+│        100s ago                                       now (MB)  │
+│  Peak CPU: 78%  │  Peak RAM: 215 MB  │  Threads: 42            │
 ├───────────────────────────────────────────────────────────────┤
 │  [↑/↓] Navigate  [TAB] Switch Tabs  [e] Export  [q] Quit      │
 └───────────────────────────────────────────────────────────────┘
@@ -235,7 +259,7 @@ type TelemetryProvider interface {
 
 ---
 
-## 9. Non-Functional Constraints
+## 10. Non-Functional Constraints
 
 | Constraint | Target | Current Status |
 |------------|--------|----------------|
@@ -251,13 +275,14 @@ type TelemetryProvider interface {
 
 ---
 
-## 10. Testing & Coverage
+## 11. Testing & Coverage
 
 ### Test Files
 
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `internal/engine/engine_test.go` | 20 tests | Ring buffer: new/empty, push/chronological order, eviction, latest, count, single-element, non-mutation, concurrent push, concurrent read/write. Engine: new, start/stop, set-target, poll, no-target error, provider error, close, concurrent poll safety |
+| `internal/chart/chart_test.go` | 3 tests | RenderCPUChart empty/basic, BtopGraphRows height |
 | `internal/engine/types_test.go` | 7 tests | MetricsSummary: empty, single, multiple, uniform, floating-point, zero values. NewTelemetrySnapshot |
 | `internal/platform/mock/mock_test.go` | 15 tests + 1 benchmark | Provider: deterministic output, different seeds, valid ranges, sinusoidal variation, step increment, PID ignored, memory leak after 100, leak cap, thread variation, copy semantics, close. Static helpers: MockDevice, MockProcess. BenchmarkSample |
 | `internal/platform/android/provider_test.go` | 50 tests | Discovery: empty/headers/emulators/physical/offline/unauthorized. Process: empty/header-only/app/kernel-threads/multiple. BuildType: debuggable/release/alt-format/empty. Telemetry: CPU found/not-found/empty/zero/varied, VmRSS found/not-found/empty/zero, Threads found/not-found/empty/many. Preflight: version parse/no-match/empty/string. Provider: new/set-device/adb-command/close/interfaces/AdbError |

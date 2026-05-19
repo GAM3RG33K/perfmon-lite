@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { miniGauge, renderAreaBlock } from './tuiChart'
 
 const FEATURES = [
   { icon: '⚡', title: 'Instant Start', desc: 'Boot-to-profiling in under a second. No heavy IDEs.' },
@@ -184,44 +185,82 @@ function CopyButton({ text }) {
 
 /* ─── Terminal with live metrics ────────────────────────── */
 
-// Draw a mini line chart using Unicode half-blocks
-function lineChartStr(pct) {
-  const w = 30
-  const filled = Math.round(pct / 100 * w)
-  let s = ''
-  for (let i = 0; i < w; i++) {
-    if (i < filled) s += '█'
-    else s += '░'
-  }
-  return s
+function useChartHistory(metrics) {
+  const history = useRef({ cpu: [], mem: [], ticks: 0 })
+  const [series, setSeries] = useState({ cpu: [], mem: [], ticks: 0 })
+
+  useEffect(() => {
+    const memPct = Math.round((metrics.memUsed / parseFloat(metrics.memTotal)) * 100)
+    const h = history.current
+    h.cpu = [...h.cpu, metrics.cpuLoad].slice(-50)
+    h.mem = [...h.mem, memPct].slice(-50)
+    h.ticks += 1
+    setSeries({ cpu: [...h.cpu], mem: [...h.mem], ticks: h.ticks })
+  }, [metrics.cpuLoad, metrics.memUsed, metrics.memTotal])
+
+  return series
+}
+
+function lineClass(line, inCpu, inMem) {
+  if (line.includes('CPU Utilization')) return 'chart-title cpu-title'
+  if (line.includes('Memory  ')) return 'chart-title mem-title'
+  if (inCpu) return 'chart-cpu'
+  if (inMem) return 'chart-mem'
+  if (line.startsWith('│ Status:')) return 'status'
+  if (line.includes('Peak CPU:')) return 'stats'
+  if (line.includes('[↑/↓]')) return 'footer-hint'
+  if (line.includes('[Dashboard]')) return 'tabs'
+  return 'dim'
 }
 
 function LiveTerminal({ mouse }) {
   const device = useDeviceInfo()
   const m = useLiveMetrics(device.device)
+  const series = useChartHistory(m)
   const ver = import.meta.env.VITE_APP_VERSION || 'dev'
+  const chartW = 52
+  const chartH = 8
+  const memPct = Math.round((m.memUsed / parseFloat(m.memTotal)) * 100)
+  const memMB = Math.round(m.memUsed * 1024)
+
+  const cpuData = series.cpu.length >= 2 ? series.cpu : [m.cpuLoad, m.cpuLoad + 1]
+  const memData = series.mem.length >= 2 ? series.mem : [memPct, memPct + 1]
+  const cpuChart = renderAreaBlock(cpuData, chartW, chartH, 6, '100')
+  const memChart = renderAreaBlock(memData, chartW, chartH, 6, '100')
+
+  const peakCpu = series.cpu.length ? Math.max(...series.cpu) : m.cpuLoad
+  const peakMemGB = series.mem.length
+    ? (Math.max(...series.mem) * parseFloat(m.memTotal) / 100).toFixed(1)
+    : m.memUsed.toFixed(1)
+  const avgCpu = series.cpu.length ? Math.round(series.cpu.reduce((a, b) => a + b, 0) / series.cpu.length) : m.cpuLoad
+  const avgMemGB = series.mem.length
+    ? (Math.round(series.mem.reduce((a, b) => a + b, 0) / series.mem.length) * parseFloat(m.memTotal) / 100).toFixed(1)
+    : m.memUsed.toFixed(1)
 
   const lines = [
-    `┌────────────────────────────────────────────────────────────┐`,
-    `│ perfmon-tool v${(ver + ' ').padEnd(14)} Device: ${m.device.padEnd(15)} Uptime: ${m.uptime.padEnd(5)} │`,
-    `├────────────────────────────────────────────────────────────┤`,
-    `│ [Dashboard]                                          (q) quit │`,
-    `├────────────────────────────────────────────────────────────┤`,
-    `│ ${('CPU: ' + m.cpuCores + ' cores').padEnd(20)} ${('Mem: ' + m.memTotal + ' GB').padEnd(15)} App: com.example.app [DEBUG] │`,
-    `├────────────────────────────────────────────────────────────┤`,
-    `│ CPU Utilization (overall)  ${m.cpuLoad}%`,
-    `│ ${lineChartStr(m.cpuLoad)} ${String(m.cpuLoad).padStart(3)}%`,
+    `┌──────────────────────────────────────────────────────────────────┐`,
+    `│ perfmon v${ver}  [MOCK]`,
+    `│ Target: ${device.device.padEnd(18)} App: com.example.app [DEBUG]`,
+    `│ ${'─'.repeat(64)}`,
+    `│ [Dashboard]  [System Logs]`,
+    `│ ${'─'.repeat(64)}`,
+    `│ Status: ● CPU: ${m.cpuLoad.toFixed(1)}%  RAM: ${m.memUsed.toFixed(1)} GB  Threads: ${m.threads}`,
     `│`,
-    `│ Memory (Total: ${m.memTotal} GB)  ${m.memUsed.toFixed(1)} GB used`,
-    `│ ${lineChartStr(Math.round(m.memUsed / parseFloat(m.memTotal) * 100))} ${Math.round(m.memUsed / parseFloat(m.memTotal) * 100)}%`,
+    `│ CPU Utilization  ${m.cpuLoad.toFixed(1)}%  ${miniGauge(m.cpuLoad)}`,
+    ...cpuChart.map((l) => `│ ${l}`),
     `│`,
-    `│ Threads: ${m.threads}  │  Peak CPU: ${m.cpuLoad + 12}%  │  Peak RAM: ${(m.memUsed + 0.5).toFixed(1)} GB`,
-    `├────────────────────────────────────────────────────────────┤`,
-    `│ [↑/↓] Scroll  [TAB] Switch  [e] Export  [?] Help  [q] Quit  │`,
-    `├────────────────────────────────────────────────────────────┤`,
-    `│ INFO  System ready  |  INFO  Polling every 1s  |  OK  12 samples │`,
-    `└────────────────────────────────────────────────────────────┘`,
+    `│ Memory  ${memMB} MB  ${miniGauge(memPct)}`,
+    ...memChart.map((l) => `│ ${l}`),
+    `│`,
+    `│ Peak CPU: ${peakCpu.toFixed(1)}% │ Peak RAM: ${peakMemGB} GB │ Avg CPU: ${avgCpu}% │ Avg RAM: ${avgMemGB} GB │`,
+    `│ Peak Threads: ${m.threads + 5} │ Duration: ${series.ticks * 2}s`,
+    `│ ${'─'.repeat(64)}`,
+    `│ [↑/↓] Scroll  [TAB] Switch  [e] Export  [r] Refresh  [?] Help  [q] Quit`,
+    `└──────────────────────────────────────────────────────────────────┘`,
   ]
+
+  const cpuStart = lines.findIndex((l) => l.includes('CPU Utilization'))
+  const memStart = lines.findIndex((l) => l.includes('Memory  '))
 
   return (
     <section className="terminal-section">
@@ -234,7 +273,7 @@ function LiveTerminal({ mouse }) {
         </div>
         <div className="terminal-body">
           {lines.map((l, i) => (
-            <div key={i} className={`line ${i >= 6 && i <= 8 ? 'cyan' : i >= 9 && i <= 11 ? 'magenta' : i === 13 ? 'amber' : i >= 15 ? 'dim' : 'dim'}`}>
+            <div key={i} className={`line ${lineClass(l, i > cpuStart && i <= cpuStart + cpuChart.length, i > memStart && i <= memStart + memChart.length)}`}>
               {l}
             </div>
           ))}

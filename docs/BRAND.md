@@ -105,7 +105,7 @@ The final output should be a clean SVG-able black line logo
 
 ### Terminal integration
 ```
-┌─ perfmon v0.0.5 ⎈ ─────────────────────────────┐
+┌─ perfmon v0.0.7 ⎈ ─────────────────────────────┐
 │  Target: Pixel 8  │  App: com.example.app       │
 ├────────────────────────────────────────────────┤
 ```

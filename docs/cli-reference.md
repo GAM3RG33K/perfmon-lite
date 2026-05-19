@@ -1,7 +1,7 @@
 # perfmon — CLI Reference
 
 > **Command:** `perfmon`
-> **Version:** 1.0.0
+> **Version:** 0.0.7 (see `VERSION` file)
 > **Stack:** Go, Bubble Tea, Lipgloss
 
 ---
@@ -130,8 +130,8 @@ perfmon
 | Format | File | Contents |
 |--------|------|----------|
 | `json` | `<output>.json` | Structured data matching PRD schema v1: metadata, metrics_summary, telemetry array |
-| `md` | `<output>.md` | Human-readable Markdown report with summary table, telemetry table, ASCII sparklines |
-| `html` | `<output>.html` | Standalone HTML with dark theme CSS, SVG vector charts for CPU/Memory/Threads |
+| `md` | `<output>.md` | Human-readable Markdown report with summary table, telemetry table, btop-style block area charts |
+| `html` | `<output>.html` | Standalone HTML with dark theme CSS and embedded block area charts (matches TUI) |
 | `pdf` | `<output>.pdf` | Native PDF with vector line charts on multiple pages (via `go-pdf/fpdf`) |
 
 **JSON Schema:** The JSON export conforms to `https://perfmon.qzz.io/schemas/export-v1.json`. See `docs/architecture.md` §6 for the full schema specification, including `metadata`, `metrics_summary`, and `telemetry` arrays.

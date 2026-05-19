@@ -30,6 +30,8 @@ var (
 
 	// MediumGray — secondary background
 	MediumGray = lipgloss.Color("#2D2D2D")
+
+	ChartGrid = lipgloss.Color("#334155")
 )
 
 // Common style shortcuts

@@ -32,9 +32,15 @@
 - [x] `internal/engine/targets.go` — Shared interfaces
 - [x] `internal/platform/mock/mock.go` — Mock telemetry provider
 
+### Chart (shared renderer)
+- [x] `internal/chart/chart.go` — Btop-style block area charts, Catmull-Rom smoothing, gauges
+- [x] `internal/chart/chart_test.go` — Chart renderer unit tests
+
 ### TUI
 - [x] `internal/tui/model.go` — Core Bubble Tea model
-- [x] `internal/tui/views/dashboard.go` — CPU, memory, thread charts
+- [x] `internal/tui/views/dashboard.go` — CPU and memory area charts
+- [x] `internal/tui/views/area_chart.go` — Lipgloss-colored chart wrapper
+- [x] `internal/tui/views/layout.go` — Responsive line truncation helpers
 - [x] `internal/tui/views/target_selector.go` — Device/process list
 - [x] `internal/tui/views/logs.go` — System logs
 - [x] `internal/tui/styles/colors.go` — Color constants
@@ -79,8 +85,10 @@
 - [x] `internal/export/types.go` — ExportData, Options, BuildExportData
 - [x] `internal/export/export.go` — Format dispatcher + path resolution
 - [x] `internal/export/json.go` — JSON export (PRD schema v1)
-- [x] `internal/export/markdown.go` — Markdown report with ASCII sparklines + tables
-- [x] `internal/export/html.go` — HTML export with SVG vector charts + embedded CSS
+- [x] `internal/export/markdown.go` — Markdown report with block area charts + tables
+- [x] `internal/export/html.go` — HTML export with embedded chart.js + CSS
+- [x] `internal/export/templates/chart.js` — Client-side chart renderer for HTML export
+- [x] `web/src/tuiChart.js` — Landing-page chart demo (matches TUI renderer)
 - [x] `internal/export/pdf.go` — PDF export with vector line graphs (go-pdf/fpdf)
 - [x] `internal/export/templates/style.css` — Dark-theme CSS (`//go:embed`)
 - [x] `internal/export/export_test.go` — 35 unit tests covering all formats

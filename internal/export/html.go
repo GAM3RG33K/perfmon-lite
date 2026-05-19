@@ -8,6 +8,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/w1n/perfmon/internal/chart"
 	"github.com/w1n/perfmon/internal/engine"
 )
 
@@ -106,15 +107,14 @@ const htmlTemplate = `<!DOCTYPE html>
       <line x1="0" y1="150" x2="{{ .ChartWidth }}" y2="150" stroke="#333" stroke-width="0.5" stroke-dasharray="4,4"/>
       <line x1="0" y1="200" x2="{{ .ChartWidth }}" y2="200" stroke="#333" stroke-width="1"/>
       <!-- CPU Line -->
-      <polyline fill="none" stroke="#00FFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      <polyline fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
         points="{{ .CPULinePoints }}"/>
-      <!-- CPU Fill -->
-      <polygon fill="url(#cpuGradient)" opacity="0.3"
+      <polygon fill="url(#cpuGradient)" opacity="0.45"
         points="0,200 {{ .CPULinePoints }} {{ .ChartWidth }},200"/>
       <defs>
         <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#00FFFF" stop-opacity="0.6"/>
-          <stop offset="100%" stop-color="#00FFFF" stop-opacity="0.05"/>
+          <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.7"/>
+          <stop offset="100%" stop-color="#172554" stop-opacity="0.1"/>
         </linearGradient>
       </defs>
     </svg>
@@ -135,15 +135,14 @@ const htmlTemplate = `<!DOCTYPE html>
       <line x1="0" y1="150" x2="{{ .ChartWidth }}" y2="150" stroke="#333" stroke-width="0.5" stroke-dasharray="4,4"/>
       <line x1="0" y1="200" x2="{{ .ChartWidth }}" y2="200" stroke="#333" stroke-width="1"/>
       <!-- Memory Line -->
-      <polyline fill="none" stroke="#FF00FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      <polyline fill="none" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
         points="{{ .MemLinePoints }}"/>
-      <!-- Memory Fill -->
-      <polygon fill="url(#memGradient)" opacity="0.3"
+      <polygon fill="url(#memGradient)" opacity="0.45"
         points="0,200 {{ .MemLinePoints }} {{ .ChartWidth }},200"/>
       <defs>
         <linearGradient id="memGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#FF00FF" stop-opacity="0.6"/>
-          <stop offset="100%" stop-color="#FF00FF" stop-opacity="0.05"/>
+          <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.7"/>
+          <stop offset="100%" stop-color="#2e1065" stop-opacity="0.1"/>
         </linearGradient>
       </defs>
     </svg>
@@ -349,29 +348,48 @@ func ExportHTML(data ExportData, snapshots []engine.TelemetrySnapshot, opts Opti
 	return outPath, nil
 }
 
-// buildSVGLinePoints generates SVG polyline points from telemetry data.
-// Chart area: width x height pixels. Values are mapped from [dataMin, dataMax] to [height, 0].
 func buildSVGLinePoints(snapshots []engine.TelemetrySnapshot, width, height int, dataMin, dataMax float64, valueFn func(engine.TelemetrySnapshot) float64) string {
 	if len(snapshots) == 0 {
 		return ""
 	}
-
-	n := len(snapshots)
-	var step float64
-	if n == 1 {
-		step = 0
-	} else {
-		step = float64(width) / float64(n-1)
+	if len(snapshots) == 1 {
+		rangeY := dataMax - dataMin
+		if rangeY == 0 {
+			rangeY = 1
+		}
+		val := valueFn(snapshots[0])
+		y := float64(height) - ((val-dataMin)/rangeY)*float64(height)
+		if y < 0 {
+			y = 0
+		}
+		if y > float64(height) {
+			y = float64(height)
+		}
+		return fmt.Sprintf("0.0,%.1f", y)
 	}
+
+	rawN := len(snapshots)
+	if rawN > chart.MaxPoints {
+		rawN = chart.MaxPoints
+	}
+	raw := chart.SampleSnapshots(snapshots, rawN, valueFn)
+	smooth := chart.SmoothSeries(raw, width)
+
 	rangeY := dataMax - dataMin
 	if rangeY == 0 {
 		rangeY = 1
 	}
 
+	var step float64
+	if width == 1 {
+		step = 0
+	} else {
+		step = float64(width) / float64(width-1)
+	}
+
 	var b strings.Builder
-	for i, s := range snapshots {
+	for i, val := range smooth {
 		x := float64(i) * step
-		val := valueFn(s)
 		y := float64(height) - ((val-dataMin)/rangeY)*float64(height)
 		if y < 0 {
 			y = 0
@@ -383,82 +401,6 @@ func buildSVGLinePoints(snapshots []engine.TelemetrySnapshot, width, height int,
 			b.WriteString(" ")
 		}
 		b.WriteString(fmt.Sprintf("%.1f,%.1f", x, y))
-	}
-	return b.String()
-}
-
-// buildASCIISparkline creates an ASCII line chart string for Markdown export.
-// Uses Unicode half-blocks for a line-fill style matching the TUI.
-func buildASCIISparkline(snapshots []engine.TelemetrySnapshot, valueFn func(engine.TelemetrySnapshot) float64, minVal, maxVal float64) string {
-	if len(snapshots) < 2 {
-		return ""
-	}
-
-	width := 40
-	if len(snapshots) < width {
-		width = len(snapshots)
-	}
-
-	step := float64(len(snapshots)) / float64(width)
-	height := 6
-	canvas := make([][]rune, height)
-	for i := range canvas {
-		canvas[i] = make([]rune, width)
-		for j := range canvas[i] {
-			canvas[i][j] = '.'
-		}
-	}
-
-	rangeY := maxVal - minVal
-	if rangeY == 0 {
-		rangeY = 1
-	}
-
-	for i := 0; i < width; i++ {
-		idx := int(float64(i) * step)
-		if idx >= len(snapshots) {
-			idx = len(snapshots) - 1
-		}
-		val := valueFn(snapshots[idx])
-		normalized := (val - minVal) / rangeY
-		// Map to cell row (0 = top, height-1 = bottom)
-		cellRow := height - 1 - int(normalized*float64(height-1))
-		if cellRow < 0 {
-			cellRow = 0
-		}
-		if cellRow >= height {
-			cellRow = height - 1
-		}
-		// Fill from cellRow to bottom
-		for row := cellRow; row < height; row++ {
-			if row == cellRow {
-				canvas[row][i] = '█' // line point
-			} else {
-				canvas[row][i] = '▓' // fill below
-			}
-		}
-		// Half-block precision: if the point falls between rows, use ▄ or ▀
-		frac := (normalized*float64(height-1) - float64(height-1-cellRow))
-		if frac > 0.3 && frac < 0.7 && cellRow > 0 {
-			canvas[cellRow][i] = '▄'
-		}
-	}
-
-	// If there are consecutive identical rows with █, connect with │
-	for i := 1; i < width-1; i++ {
-		for row := 0; row < height-1; row++ {
-			if canvas[row][i] == '█' && canvas[row][i-1] != '█' && canvas[row+1][i] == '▓' {
-				if canvas[row+1][i-1] == '▓' {
-					canvas[row][i] = '╱'
-				}
-			}
-		}
-	}
-
-	var b strings.Builder
-	for row := 0; row < height; row++ {
-		b.WriteString(string(canvas[row]))
-		b.WriteString("\n")
 	}
 	return b.String()
 }

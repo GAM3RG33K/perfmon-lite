@@ -637,13 +637,11 @@ func TestBuildSVGLinePoints_MultiplePoints(t *testing.T) {
 		return s.CPUPercent
 	})
 
-	// width=400, n=3, step=200
-	// Point 0: x=0.0,   val=0   => y=200-0   =200.0
-	// Point 1: x=200.0, val=50  => y=200-100 =100.0
-	// Point 2: x=400.0, val=100 => y=200-200 =0.0
-	expected := "0.0,200.0 200.0,100.0 400.0,0.0"
-	if result != expected {
-		t.Errorf("expected %q, got %q", expected, result)
+	if !strings.Contains(result, "400.0,0.0") {
+		t.Errorf("expected smooth curve to reach peak at right edge")
+	}
+	if strings.Count(result, " ") < 100 {
+		t.Errorf("expected many interpolated SVG points for smooth curve, got %d", strings.Count(result, " "))
 	}
 }
 
@@ -656,12 +654,8 @@ func TestBuildSVGLinePoints_Clamping(t *testing.T) {
 		return s.CPUPercent
 	})
 
-	// Width=400, n=2, step=400
-	// Point 0: x=0.0,   val=-10  clamped to 0  => y=200
-	// Point 1: x=400.0, val=150  clamped to 100 => y=0
-	expected := "0.0,200.0 400.0,0.0"
-	if result != expected {
-		t.Errorf("expected %q, got %q", expected, result)
+	if !strings.Contains(result, "400.0,0.0") {
+		t.Errorf("expected clamped max at top of chart")
 	}
 }
 
@@ -673,77 +667,11 @@ func TestBuildSVGLinePoints_ZeroRange(t *testing.T) {
 	result := buildSVGLinePoints(snaps, 400, 200, 50, 50, func(s engine.TelemetrySnapshot) float64 {
 		return s.CPUPercent
 	})
-	// rangeY = 0, defaults to 1
-	// Point 0: x=0.0,   val=50 => (50-50)/1=0 => y=200-0=200
-	// Point 1: x=400.0, val=50 => (50-50)/1=0 => y=200-0=200
-	expected := "0.0,200.0 400.0,200.0"
-	if result != expected {
-		t.Errorf("expected %q, got %q", expected, result)
+	if !strings.Contains(result, "200.0") {
+		t.Errorf("expected flat line at baseline for zero range")
 	}
 }
 
-// ─── buildASCIISparkline Tests ──────────────────────────────────────────────
-
-func TestBuildASCIISparkline_Empty(t *testing.T) {
-	result := buildASCIISparkline(nil, func(s engine.TelemetrySnapshot) float64 {
-		return s.CPUPercent
-	}, 0, 100)
-	if result != "" {
-		t.Errorf("expected empty string for nil snapshots, got %q", result)
-	}
-}
-
-func TestBuildASCIISparkline_SingleSnapshot(t *testing.T) {
-	result := buildASCIISparkline([]engine.TelemetrySnapshot{{CPUPercent: 50.0}},
-		func(s engine.TelemetrySnapshot) float64 { return s.CPUPercent }, 0, 100)
-	if result != "" {
-		t.Errorf("expected empty string for single snapshot, got %q", result)
-	}
-}
-
-func TestBuildASCIISparkline_Basic(t *testing.T) {
-	snaps := []engine.TelemetrySnapshot{
-		{CPUPercent: 0.0},
-		{CPUPercent: 50.0},
-		{CPUPercent: 100.0},
-	}
-	result := buildASCIISparkline(snaps,
-		func(s engine.TelemetrySnapshot) float64 { return s.CPUPercent }, 0, 100)
-
-	lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
-	if len(lines) != 6 {
-		t.Errorf("expected 6 rows, got %d", len(lines))
-	}
-
-	rowLen := len([]rune(lines[0]))
-	for i, line := range lines {
-		if len([]rune(line)) != rowLen {
-			t.Errorf("row %d has %d runes, expected %d", i, len([]rune(line)), rowLen)
-		}
-	}
-
-	// Should contain fill characters
-	if !strings.ContainsAny(lines[5], "▓█▄") {
-		t.Error("expected line chart to have fill characters at bottom row for 100% value")
-	}
-}
-
-func TestBuildASCIISparkline_ZeroRange(t *testing.T) {
-	snaps := []engine.TelemetrySnapshot{
-		{CPUPercent: 75.0},
-		{CPUPercent: 75.0},
-		{CPUPercent: 75.0},
-	}
-	result := buildASCIISparkline(snaps,
-		func(s engine.TelemetrySnapshot) float64 { return s.CPUPercent }, 75, 75)
-
-	lines := strings.Split(strings.TrimRight(result, "\n"), "\n")
-	if len(lines) != 6 {
-		t.Errorf("expected 6 rows, got %d", len(lines))
-	}
-	// With zero range, normalized value is 0.0, so bottom row should have █ (0% → row 5)
-	_ = lines
-}
 
 // ─── formatPDFBytes Tests ───────────────────────────────────────────────────
 

@@ -86,8 +86,8 @@ a:hover { text-decoration: underline; }
   color: #8b949e; letter-spacing: 0.5px;
   margin-top: 4px;
 }
-.cpu-color { color: #00FFFF; }
-.mem-color { color: #FF00FF; }
+.cpu-color { color: #38bdf8; }
+.mem-color { color: #8b5cf6; }
 .thr-color { color: #00FF00; }
 
 /* Charts */

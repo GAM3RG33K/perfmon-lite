@@ -212,18 +212,26 @@
 - Created `docs/domain-setup.md` for Cloudflare configuration
 - Created `docs/AI_CONVERSATION_SUMMARY.md` (this file)
 - Updated `docs/architecture.md` with current binary size and CPU overhead
-- Version tracking: v0.0.1 (beta) → v0.0.2 → v0.0.3 → v0.0.4 → v0.0.5
+- Version tracking: v0.0.1 (beta) → v0.0.2 → v0.0.3 → v0.0.4 → v0.0.5 → v0.0.6 → v0.0.7
 - All doc references synced across README, CLI reference, USAGE.md, and landing page
+
+---
+
+## Milestone 14: Unified Chart Renderer (v0.0.7)
+
+- Added `internal/chart` package: btop-style block area charts with Catmull-Rom smoothing (100-point window)
+- TUI dashboard uses `area_chart.go` with Lipgloss gradient coloring on block symbols
+- Markdown/HTML exports share the same chart logic (`chart.RenderCPUChart`, embedded `templates/chart.js`)
+- Landing page demo uses `web/src/tuiChart.js` (JavaScript port of the Go renderer)
+- `layout.go` helpers for responsive line truncation in TUI views
+- Log export on quit appends `chart.RenderSessionCharts` session summary
 
 ---
 
 ## Final Technical Summary
 
-**Last Commit:** `3594f59` — Fix HTML template: add 'inc' function, replace 'add $i 1' in stack traces
-**Latest Tag:** `v0.0.5`
-**Total Commits (session):** ~65
-**Files Changed (session):** ~85+
-**Tests:** All 183+ tests pass with `-race`
+**Latest Tag:** `v0.0.7`
+**Tests:** All 186+ tests pass with `-race` (includes `internal/chart`)
 
 ### Architecture Overview
 

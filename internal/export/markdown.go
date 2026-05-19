@@ -7,6 +7,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/w1n/perfmon/internal/chart"
 	"github.com/w1n/perfmon/internal/engine"
 )
 
@@ -45,7 +46,7 @@ const markdownTemplate = `{{ .AsciiLogo }}
 {{ .CPUSparkline }}
 ` + "```" + `
 
-> Line chart (█ = value, ▓ = fill). Range: 0%–100%
+> btop-style area chart (last {{ .ChartWindow }} samples)
 
 ---
 
@@ -55,7 +56,7 @@ const markdownTemplate = `{{ .AsciiLogo }}
 {{ .MemSparkline }}
 ` + "```" + `
 
-> Line chart (█ = value, ▓ = fill). Values in MB
+> btop-style area chart (last {{ .ChartWindow }} samples)
 
 ---
 
@@ -105,6 +106,7 @@ type mdRenderer struct {
 	CPUSparkline string
 	MemSparkline string
 	AsciiLogo    string
+	ChartWindow  int
 }
 
 // ExportMarkdown writes the export data as a Markdown file.
@@ -117,14 +119,9 @@ func ExportMarkdown(data ExportData, snapshots []engine.TelemetrySnapshot, opts 
 	}
 	defer f.Close()
 
-	// Build ASCII sparklines for the report
-	cpuSpark := buildASCIISparkline(snapshots, func(s engine.TelemetrySnapshot) float64 {
-		return s.CPUPercent
-	}, 0, 100)
-
-	memSpark := buildASCIISparkline(snapshots, func(s engine.TelemetrySnapshot) float64 {
-		return float64(s.MemoryKB) / 1024.0
-	}, 0, 500)
+	plotW := chart.DefaultWidth
+	cpuSpark := chart.RenderCPUChart(snapshots, plotW)
+	memSpark := chart.RenderMemoryChart(snapshots, plotW)
 
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
@@ -150,6 +147,7 @@ func ExportMarkdown(data ExportData, snapshots []engine.TelemetrySnapshot, opts 
 		CPUSparkline: cpuSpark,
 		MemSparkline: memSpark,
 		AsciiLogo:    asciiLogo,
+		ChartWindow:  chart.MaxPoints,
 	}
 
 	if err := tmpl.Execute(f, renderer); err != nil {
