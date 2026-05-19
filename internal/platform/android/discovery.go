@@ -3,7 +3,7 @@ package android
 import (
 	"strings"
 
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // Discover returns a list of connected Android devices by parsing the

@@ -8,7 +8,7 @@
 ## Prerequisites
 
 - [x] Go >=1.22 installed (`go version`) — Go 1.26.3 via Homebrew
-- [x] Project directory initialized with `go mod init github.com/w1n/perfmon`
+- [x] Project directory initialized with `go mod init github.com/GAM3RG33K/perfmon-lite`
 
 ---
 

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // Sample collects a single telemetry snapshot for the given PID on the

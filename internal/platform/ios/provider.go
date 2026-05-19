@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // iOSProvider implements the PlatformProvider interface for iOS simulators

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // cpuStackThreshold — fetch stack trace when CPU exceeds this %
@@ -39,7 +39,7 @@ func (p *ADBProvider) Sample(pid int32) (*engine.TelemetrySnapshot, error) {
 	// Build the sampling command — stat + status
 	// /proc/<pid>/stat gives CPU ticks; /proc/<pid>/status gives memory + threads
 	sampleCmd := fmt.Sprintf(
-		`cat /proc/%d/stat 2>/dev/null; echo "===MEM==="; cat /proc/%d/status 2>/dev/null`,
+		`cat /proc/%d/stat 2>/dev/null; echo "===PERFMON_MEM_MARKER==="; cat /proc/%d/status 2>/dev/null`,
 		pid, pid,
 	)
 
@@ -56,18 +56,22 @@ func (p *ADBProvider) Sample(pid int32) (*engine.TelemetrySnapshot, error) {
 	if err != nil {
 		rawOutput, err = p.adbExec("-s", deviceID, "shell", sampleCmd)
 		if err != nil {
+			p.consecutiveFailures++
+			if p.consecutiveFailures >= consecutiveFailLimit {
+				return nil, fmt.Errorf("device appears disconnected after %d consecutive failures: %w", p.consecutiveFailures, err)
+			}
 			return nil, fmt.Errorf("sample failed for PID %d: %w", pid, err)
 		}
 	}
 
-	// Split output into sections
-	parts := strings.SplitN(rawOutput, "===MEM===\n", 2)
-	if len(parts) != 2 {
+	// Reset failure counter on successful sample
+	p.consecutiveFailures = 0
+
+	// Split output into sections using a unique delimiter that won't appear in /proc output
+	statOutput, statusOutput, found := splitSampleOutput(rawOutput)
+	if !found {
 		return nil, fmt.Errorf("unexpected sample output format for PID %d", pid)
 	}
-
-	statOutput := parts[0]
-	statusOutput := parts[1]
 
 	// Parse CPU from /proc/<pid>/stat ticks
 	now := time.Now()
@@ -100,13 +104,23 @@ func (p *ADBProvider) Sample(pid int32) (*engine.TelemetrySnapshot, error) {
 
 // readProcStack reads /proc/<pid>/stack via the persistent ADB shell.
 func (p *ADBProvider) readProcStack(pid int32) string {
-	cmd := fmt.Sprintf("cat /proc/%d/stack 2>/dev/null; echo '===END==='", pid)
+	cmd := fmt.Sprintf("cat /proc/%d/stack 2>/dev/null; echo '===PERFMON_STACK_END==='", pid)
 	var out string
 	var err error
 
 	err = p.ensureShell()
 	if err == nil {
 		out, err = p.execInShell(cmd)
+	}
+	if err != nil {
+		out, err = p.adbExec("-s", p.DeviceID, "shell", cmd)
+		if err != nil {
+			return ""
+		}
+	}
+	// Trim after the end marker
+	if idx := strings.Index(out, "===PERFMON_STACK_END==="); idx >= 0 {
+		out = out[:idx]
 	}
 	if err != nil {
 		out, err = p.adbExec("-s", p.DeviceID, "shell", cmd)
@@ -243,4 +257,22 @@ func parseThreads(statusOutput string) int32 {
 		return int32(threads)
 	}
 	return -1
+}
+
+// splitSampleOutput separates the combined /proc output into stat and status sections.
+// It searches for the unique delimiter line (with or without trailing newline) to handle
+// edge cases where the final line may or may not end with a newline.
+func splitSampleOutput(raw string) (statOutput, statusOutput string, found bool) {
+	delimiters := []string{
+		"===PERFMON_MEM_MARKER===\n",
+		"===PERFMON_MEM_MARKER===",
+	}
+	for _, delim := range delimiters {
+		if idx := strings.Index(raw, delim); idx >= 0 {
+			statOutput = raw[:idx]
+			statusOutput = raw[idx+len(delim):]
+			return statOutput, statusOutput, true
+		}
+	}
+	return "", "", false
 }

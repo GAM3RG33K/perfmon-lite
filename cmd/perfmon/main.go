@@ -17,12 +17,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/w1n/perfmon/internal/engine"
-	"github.com/w1n/perfmon/internal/export"
-	"github.com/w1n/perfmon/internal/platform/android"
-	iosPkg "github.com/w1n/perfmon/internal/platform/ios"
-	"github.com/w1n/perfmon/internal/platform/mock"
-	perfmonTui "github.com/w1n/perfmon/internal/tui"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/export"
+	"github.com/GAM3RG33K/perfmon-lite/internal/platform/android"
+	iosPkg "github.com/GAM3RG33K/perfmon-lite/internal/platform/ios"
+	"github.com/GAM3RG33K/perfmon-lite/internal/platform/mock"
+	perfmonTui "github.com/GAM3RG33K/perfmon-lite/internal/tui"
 )
 
 // Exit codes (see docs/cli-reference.md §6)
@@ -835,6 +835,11 @@ func tryiOSProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, []
 	// Auto-select the first device
 	selectedDevice := devices[0]
 	iOSProvider.SetDevice(selectedDevice.ID)
+
+	if selectedDevice.IsPhysical {
+		fmt.Fprintf(os.Stderr, "\n  ⚠ Physical iOS device detected: telemetry sampling is limited due to Apple sandbox restrictions.\n")
+		fmt.Fprintf(os.Stderr,    "  CPU/memory may be sampled at host-level (simulator processes only). Thread counts are unavailable.\n\n")
+	}
 
 	if verbose {
 		log.Printf("Selected device: %s (%s)", selectedDevice.Name, selectedDevice.ID)

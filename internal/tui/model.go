@@ -9,11 +9,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/w1n/perfmon/internal/chart"
-	"github.com/w1n/perfmon/internal/engine"
-	"github.com/w1n/perfmon/internal/export"
-	"github.com/w1n/perfmon/internal/tui/styles"
-	"github.com/w1n/perfmon/internal/tui/views"
+	"github.com/GAM3RG33K/perfmon-lite/internal/chart"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/export"
+	"github.com/GAM3RG33K/perfmon-lite/internal/tui/styles"
+	"github.com/GAM3RG33K/perfmon-lite/internal/tui/views"
 )
 
 const (
@@ -39,7 +39,6 @@ type Model struct {
 	Height     int
 	Ready      bool
 	Quitting   bool
-	Err        error
 	ShowHelp   bool
 	statusMsg  string
 	statusTime time.Time
@@ -279,9 +278,6 @@ func (m *Model) View() string {
 	}
 	if m.Quitting {
 		return "\n  Goodbye!\n"
-	}
-	if m.Err != nil {
-		return fmt.Sprintf("\n  Error: %v\n", m.Err)
 	}
 	if m.ShowHelp {
 		return m.renderHelp()

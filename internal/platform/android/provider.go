@@ -9,15 +9,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // shellReadTimeout is how long execInShell waits for a line of output before giving up.
 const shellReadTimeout = 10 * time.Second
 
+// consecutiveFailLimit is the number of consecutive Sample() failures before
+// the provider returns a terminal error (device appears disconnected).
+const consecutiveFailLimit = 5
+
 // shellEOFMaker is a unique string used to delimit command output
 // from the persistent ADB shell. Extremely unlikely to appear in real output.
-const shellEOFMaker = "__PERFMON_EOF__"
+const shellEOFMaker = "__PERFMON_EOF_MARKER__"
 
 // restartDelay is how long to wait before retrying a failed shell connection.
 const restartDelay = 500 * time.Millisecond
@@ -37,6 +41,11 @@ type ADBProvider struct {
 	shellOpen bool
 
 	mu sync.Mutex // protects DeviceID
+
+	// Consecutive failure tracking — after consecutiveFailLimit failures,
+	// the provider stops polling and returns a terminal error so the TUI
+	// can notify the user instead of logging errors every second forever.
+	consecutiveFailures int
 
 	// CPU delta tracking — /proc/<pid>/stat utime+stime from previous Sample()
 	cpuMu        sync.Mutex
@@ -131,21 +140,20 @@ func (p *ADBProvider) ensureShell() error {
 // (e.g., ANSI reset sequences or a shell prompt).
 // Uses only non-blocking operations to avoid data races.
 func (p *ADBProvider) flushShell(timeout time.Duration) {
-	// Wait a brief moment for the shell to start producing output.
-	// Then drain only what's already in the in-memory buffer.
+	// Wait for the shell to start producing output, then drain
+	// what's already in the in-memory buffer.
 	// Any data that arrives later will be consumed by execInShell's
 	// ReadString loop as noise before the actual command output.
 	deadline := time.After(timeout)
 	for {
 		if n := p.shellOut.Buffered(); n > 0 {
 			p.shellOut.Discard(n)
-			continue
 		}
 		select {
 		case <-deadline:
 			return
-		default:
-			time.Sleep(10 * time.Millisecond)
+		case <-time.After(50 * time.Millisecond):
+			// brief pause between buffer checks
 		}
 	}
 }

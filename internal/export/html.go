@@ -8,8 +8,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/w1n/perfmon/internal/chart"
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/chart"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 //go:embed templates/style.css

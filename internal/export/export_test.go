@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -173,13 +173,11 @@ func TestBuildExportData_DefaultBuildType(t *testing.T) {
 
 func TestResolveOutputPath_DefaultPath(t *testing.T) {
 	path := ResolveOutputPath(Options{}, nil)
-	if path != "perfmon_export_0" {
-		t.Errorf("expected perfmon_export_0, got %s", path)
+	if !strings.HasPrefix(path, "perfmon_export_") {
+		t.Errorf("expected perfmon_export_ prefix, got %s", path)
 	}
-
-	path = ResolveOutputPath(Options{}, testSnapshots())
-	if path != "perfmon_export_5" {
-		t.Errorf("expected perfmon_export_5, got %s", path)
+	if len(path) <= 17 {
+		t.Errorf("expected timestamp suffix, got %s", path)
 	}
 }
 
@@ -193,8 +191,8 @@ func TestResolveOutputPath_CustomPath(t *testing.T) {
 
 func TestResolveOutputPath_EmptySnapshotsDefault(t *testing.T) {
 	path := ResolveOutputPath(Options{OutputPath: ""}, []engine.TelemetrySnapshot{})
-	if path != "perfmon_export_0" {
-		t.Errorf("expected perfmon_export_0, got %s", path)
+	if !strings.HasPrefix(path, "perfmon_export_") {
+		t.Errorf("expected perfmon_export_ prefix, got %s", path)
 	}
 }
 

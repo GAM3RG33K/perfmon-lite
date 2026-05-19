@@ -6,8 +6,8 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/w1n/perfmon/internal/engine"
-	"github.com/w1n/perfmon/internal/tui/styles"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/tui/styles"
 )
 
 // TargetSelectorView renders the device and process selection list.

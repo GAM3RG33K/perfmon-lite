@@ -1,10 +1,9 @@
 package export
 
 import (
-	"fmt"
 	"time"
 
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // Format represents an export output format.
@@ -60,7 +59,7 @@ func BuildExportData(snapshots []engine.TelemetrySnapshot, opts Options) ExportD
 		logs = []string{}
 	}
 	return ExportData{
-		Schema: fmt.Sprintf("https://perfmon.qzz.io/schemas/export-v1.json"),
+		Schema: "https://perfmon.qzz.io/schemas/export-v1.json",
 		Metadata: ExportMetadata{
 			GeneratedAt:    time.Now().UTC().Format(time.RFC3339),
 			PerfmonVersion: opts.Version,
@@ -77,5 +76,5 @@ func BuildExportData(snapshots []engine.TelemetrySnapshot, opts Options) ExportD
 
 // outputFilename returns the full output filename including extension.
 func outputFilename(basePath string, format Format) string {
-	return fmt.Sprintf("%s.%s", basePath, string(format))
+	return basePath + "." + string(format)
 }

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // ---------------------------------------------------------------------------

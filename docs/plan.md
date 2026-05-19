@@ -12,7 +12,7 @@
 | #  | Task | Status |
 |----|------|--------|
 | 0.1 | Install Go (>=1.22) | ✅ Go 1.26.3 installed via Homebrew |
-| 0.2 | Initialize Go module (`go mod init github.com/w1n/perfmon`) | ✅ `go.mod` created |
+| 0.2 | Initialize Go module (`go mod init github.com/GAM3RG33K/perfmon-lite`) | ✅ `go.mod` created |
 | 0.3 | Create directory structure (cmd/, internal/, etc.) | ✅ All dirs scaffolded |
 | 0.4 | Install TUI dependencies (bubbletea, lipgloss, bubbles) | ✅ `go mod tidy` completed |
 | 0.5 | Add Makefile / Taskfile (build, run, mock, test, lint, clean) | ✅ `Makefile` with 10 targets |

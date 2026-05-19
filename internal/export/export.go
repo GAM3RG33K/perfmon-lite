@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // Export dispatches to the appropriate format generator and returns the output path.
@@ -27,12 +28,13 @@ func Export(snapshots []engine.TelemetrySnapshot, opts Options) (string, error) 
 }
 
 // ResolveOutputPath returns the full output base path (without extension).
-// If opts.OutputPath is empty, it generates a default path.
+// If opts.OutputPath is empty, it generates a timestamped default path.
 func ResolveOutputPath(opts Options, snapshots []engine.TelemetrySnapshot) string {
 	if opts.OutputPath != "" {
 		return opts.OutputPath
 	}
-	return fmt.Sprintf("perfmon_export_%d", len(snapshots))
+	ts := time.Now().Format("2006-01-02_150405")
+	return fmt.Sprintf("perfmon_export_%s", ts)
 }
 
 // EnsureOutputDir creates the parent directory for the output file if needed.

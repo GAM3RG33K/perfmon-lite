@@ -6,9 +6,9 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/w1n/perfmon/internal/chart"
-	"github.com/w1n/perfmon/internal/engine"
-	"github.com/w1n/perfmon/internal/tui/styles"
+	"github.com/GAM3RG33K/perfmon-lite/internal/chart"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/tui/styles"
 )
 
 const chartLabelWidth = 6

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // MapProcesses returns running processes for the given iOS device/simulator.

@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/w1n/perfmon/internal/tui/styles"
+	"github.com/GAM3RG33K/perfmon-lite/internal/tui/styles"
 )
 
 // LogEntry represents a single log message.

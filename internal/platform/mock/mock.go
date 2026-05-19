@@ -4,7 +4,7 @@ import (
 	"math"
 	"math/rand"
 
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // Provider generates simulated telemetry data for TUI development.

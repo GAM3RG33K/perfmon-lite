@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-pdf/fpdf"
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // ExportPDF writes the export data as a PDF file with vector charts.

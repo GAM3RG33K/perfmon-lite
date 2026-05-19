@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/w1n/perfmon/internal/engine"
+	"github.com/GAM3RG33K/perfmon-lite/internal/engine"
 )
 
 // BuildType detects whether the given bundle is a debug or release build.
