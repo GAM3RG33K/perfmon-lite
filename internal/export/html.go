@@ -17,6 +17,9 @@ var cssContent string
 //go:embed templates/chart.js
 var chartJSContent string
 
+//go:embed templates/logo.svg
+var logoSVG string
+
 // htmlTemplate is the embedded HTML report template.
 const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
@@ -32,8 +35,11 @@ const htmlTemplate = `<!DOCTYPE html>
 <div class="container">
   <!-- Header -->
   <div class="header">
-    <div class="header-title">perfmon Telemetry Report</div>
-    <div class="header-meta">{{ .Metadata.GeneratedAt }}</div>
+    <div class="header-logo">{{ .Logo }}</div>
+    <div class="header-text">
+      <div class="header-title">perfmon Telemetry Report</div>
+      <div class="header-meta">{{ .Metadata.GeneratedAt }}</div>
+    </div>
   </div>
 
   <!-- Metadata Cards -->
@@ -249,6 +255,7 @@ type htmlRenderer struct {
 	CPULinePoints string
 	MemLinePoints string
 	ThrLinePoints string
+	Logo         string
 }
 
 // ExportHTML writes the export data as a standalone HTML file.
@@ -332,6 +339,7 @@ func ExportHTML(data ExportData, snapshots []engine.TelemetrySnapshot, opts Opti
 		CPULinePoints: cpuPoints,
 		MemLinePoints: memPoints,
 		ThrLinePoints: thrPoints,
+		Logo:          logoSVG,
 	}
 
 	if err := tmpl.Execute(f, renderer); err != nil {

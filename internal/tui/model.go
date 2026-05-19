@@ -551,6 +551,23 @@ func (m *Model) exportLogs() (string, error) {
 	}
 	defer f.Close()
 
+	// ASCII logo header
+	fmt.Fprintln(f, "  ___  ___  ___  ___  ___  ___  ___  ___  ___")
+	fmt.Fprintln(f, "  |  \\/  | / _ \\ |  \\/  | / _ \\ |  \\/  |")
+	fmt.Fprintln(f, "  | .  . |/ /_\\ \\| .  . |/ /_\\ \\| .  . |")
+	fmt.Fprintln(f, "  | |\\/| ||  _  || |\\/| ||  _  || |\\/| |")
+	fmt.Fprintln(f, "  | |  | || | | || |  | || | | || |  | |")
+	fmt.Fprintln(f, "  \\_|  |_/\\_| |_/\\_|  |_/\\_| |_/\\_|  |_/")
+	fmt.Fprintln(f, "  ___  ___  ___  ___")
+	fmt.Fprintln(f, "  |  \\/  | / _ \\ |  \\/  |")
+	fmt.Fprintln(f, "  | .  . |/ /_\\ \\| .  . |")
+	fmt.Fprintln(f, "  | |\\/| ||  _  || |\\/| |")
+	fmt.Fprintln(f, "  | |  | || | | || |  | |")
+	fmt.Fprintln(f, "  \\_|  |_/\\_| |_/\\_|  |_/")
+	fmt.Fprintf(f, "  perfmon-tool log export\n")
+	fmt.Fprintf(f, "  Session: %s\n", time.Now().Format(time.RFC3339))
+	fmt.Fprintln(f, strings.Repeat("─", 60))
+
 	for _, e := range m.Logs.Entries {
 		line := fmt.Sprintf("[%s] [%s] %s\n", e.Timestamp.Format("15:04:05"), e.Level, e.Message)
 		if _, err := f.WriteString(line); err != nil {

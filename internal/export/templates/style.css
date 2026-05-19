@@ -13,10 +13,17 @@ a:hover { text-decoration: underline; }
 
 /* Header */
 .header {
+  display: flex; align-items: center; gap: 16px;
   border-bottom: 1px solid #30363d;
   padding-bottom: 16px;
   margin-bottom: 24px;
 }
+.header-logo svg {
+  width: 48px; height: 48px;
+  display: block;
+  flex-shrink: 0;
+}
+.header-text { flex: 1; }
 .header-title {
   font-size: 28px; font-weight: 700;
   color: #00FFFF; letter-spacing: -0.5px;
