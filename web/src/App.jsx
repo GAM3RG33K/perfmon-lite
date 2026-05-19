@@ -262,6 +262,7 @@ export default function App() {
         <header className="hero">
           <div className="hero-badge">v{import.meta.env.VITE_APP_VERSION || 'dev'} &nbsp;·&nbsp; Beta</div>
           <img src="/assets/logo.svg" alt="perfmon" className="hero-logo" />
+          <h1>perfmon</h1>
           <p className="hero-desc">Blistering-fast, terminal-based mobile app profiling. CPU, memory, and thread telemetry for Android and iOS — right in your terminal.</p>
           <div className="cta-row">
             <a href="https://get.perfmon.qzz.io" className="btn-primary">Install</a>
