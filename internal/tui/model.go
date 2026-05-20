@@ -308,7 +308,7 @@ func (m *Model) handleProcessPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.processScrollOffset = 0
 		}
 		return m, nil
-	case "t":
+	case "a":
 		m.showAllProcesses = !m.showAllProcesses
 		m.processPickerIdx = 0
 		m.processScrollOffset = 0
@@ -336,7 +336,7 @@ func (m *Model) filteredProcesses() []engine.AppProcess {
 		base = all
 	} else {
 		for _, p := range all {
-			if p.BuildType == engine.BuildDebug {
+			if p.BuildType != engine.BuildRelease {
 				base = append(base, p)
 			}
 		}
@@ -402,7 +402,7 @@ func (m *Model) renderProcessPicker() string {
 		} else if m.showAllProcesses {
 			b.WriteString(styles.LabelStyle.Render("  No processes found.\n"))
 		} else {
-			b.WriteString(styles.LabelStyle.Render("  No debuggable processes found. Launch a debug build or press [t] to show all.\n"))
+			b.WriteString(styles.LabelStyle.Render("  No processes found. Press [a] to show all processes.\n"))
 		}
 		b.WriteString("\n")
 		b.WriteString(styles.HelpFooter.Render("  Esc Clear  [t] Toggle  ↑/↓ Navigate  Enter Select  q Quit"))
@@ -444,9 +444,9 @@ func (m *Model) renderProcessPicker() string {
 	}
 
 	if m.processFilter != "" {
-		b.WriteString(styles.HelpFooter.Render("  Esc Clear  [t] Toggle  ↑/↓ Navigate  Enter Select  q Quit"))
+		b.WriteString(styles.HelpFooter.Render("  Esc Clear  [a] Toggle  ↑/↓ Navigate  Enter Select  q Quit"))
 	} else {
-		b.WriteString(styles.HelpFooter.Render("  Type to search  [t] Toggle  ↑/↓ Navigate  Enter Select  q Quit"))
+		b.WriteString(styles.HelpFooter.Render("  Type to search  [a] Toggle  ↑/↓ Navigate  Enter Select  q Quit"))
 	}
 	return b.String()
 }
