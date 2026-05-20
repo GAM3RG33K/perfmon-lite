@@ -85,6 +85,7 @@ release:
   github:
     owner: GAM3RG33K
     name: perfmon-lite
+  replace_existing_artifacts: true
   header: |
     ## perfmon {{ .Version }}
 
