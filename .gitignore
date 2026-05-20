@@ -41,3 +41,4 @@ release/
 coverage.out
 .wrangler/
 wrangler.jsonc
+perfmon_logs_*.log
