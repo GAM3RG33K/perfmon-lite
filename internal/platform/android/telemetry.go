@@ -56,16 +56,21 @@ func (p *ADBProvider) Sample(pid int32) (*engine.TelemetrySnapshot, error) {
 	if err != nil {
 		rawOutput, err = p.adbExec("-s", deviceID, "shell", sampleCmd)
 		if err != nil {
+			p.mu.Lock()
 			p.consecutiveFailures++
-			if p.consecutiveFailures >= consecutiveFailLimit {
-				return nil, fmt.Errorf("device appears disconnected after %d consecutive failures: %w", p.consecutiveFailures, err)
+			failCount := p.consecutiveFailures
+			p.mu.Unlock()
+			if failCount >= consecutiveFailLimit {
+				return nil, fmt.Errorf("device appears disconnected after %d consecutive failures: %w", failCount, err)
 			}
 			return nil, fmt.Errorf("sample failed for PID %d: %w", pid, err)
 		}
 	}
 
 	// Reset failure counter on successful sample
+	p.mu.Lock()
 	p.consecutiveFailures = 0
+	p.mu.Unlock()
 
 	// Split output into sections using a unique delimiter that won't appear in /proc output
 	statOutput, statusOutput, found := splitSampleOutput(rawOutput)
