@@ -49,6 +49,7 @@ type Model struct {
 	processPickerIdx   int
 	processScrollOffset int
 	processFilter      string
+	showAllProcesses   bool
 
 	AppPID   int32
 	AppID    string // target app identifier from --id flag (for display when not running)
@@ -307,6 +308,16 @@ func (m *Model) handleProcessPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.processScrollOffset = 0
 		}
 		return m, nil
+	case "t":
+		m.showAllProcesses = !m.showAllProcesses
+		m.processPickerIdx = 0
+		m.processScrollOffset = 0
+		mode := "debug"
+		if m.showAllProcesses {
+			mode = "all"
+		}
+		m.Logs.AddEntry("INFO", fmt.Sprintf("Process list toggled to %s processes", mode))
+		return m, nil
 	}
 
 	if len(msg.String()) == 1 {
@@ -320,12 +331,22 @@ func (m *Model) handleProcessPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) filteredProcesses() []engine.AppProcess {
 	all := m.TargetSelector.Processes
+	var base []engine.AppProcess
+	if m.showAllProcesses {
+		base = all
+	} else {
+		for _, p := range all {
+			if p.BuildType == engine.BuildDebug {
+				base = append(base, p)
+			}
+		}
+	}
 	if m.processFilter == "" {
-		return all
+		return base
 	}
 	q := strings.ToLower(m.processFilter)
 	var filtered []engine.AppProcess
-	for _, p := range all {
+	for _, p := range base {
 		if strings.Contains(strings.ToLower(p.PackageName), q) ||
 			strings.Contains(strings.ToLower(p.Name), q) ||
 			strings.Contains(fmt.Sprintf("%d", p.PID), q) {
@@ -360,7 +381,11 @@ func (m *Model) renderProcessPicker() string {
 		b.WriteString(fmt.Sprintf("  (%d/%d matches)", len(procs), len(m.TargetSelector.Processes)))
 		b.WriteString("\n\n")
 	} else {
-		b.WriteString(styles.SubHeaderStyle.Render("  Running Processes"))
+		mode := "Debug"
+		if m.showAllProcesses {
+			mode = "All"
+		}
+		b.WriteString(styles.SubHeaderStyle.Render(fmt.Sprintf("  Running Processes (%s)", mode)))
 		b.WriteString("\n\n")
 	}
 
@@ -372,9 +397,15 @@ func (m *Model) renderProcessPicker() string {
 	}
 
 	if len(procs) == 0 {
-		b.WriteString(styles.LabelStyle.Render(fmt.Sprintf("  No matches for \"%s\"\n", m.processFilter)))
+		if m.processFilter != "" {
+			b.WriteString(styles.LabelStyle.Render(fmt.Sprintf("  No matches for \"%s\"\n", m.processFilter)))
+		} else if m.showAllProcesses {
+			b.WriteString(styles.LabelStyle.Render("  No processes found.\n"))
+		} else {
+			b.WriteString(styles.LabelStyle.Render("  No debuggable processes found. Launch a debug build or press [t] to show all.\n"))
+		}
 		b.WriteString("\n")
-		b.WriteString(styles.HelpFooter.Render("  Esc to clear filter  ↑/↓ Navigate  Enter Select  q Quit"))
+		b.WriteString(styles.HelpFooter.Render("  Esc Clear  [t] Toggle  ↑/↓ Navigate  Enter Select  q Quit"))
 		return b.String()
 	}
 
@@ -413,9 +444,9 @@ func (m *Model) renderProcessPicker() string {
 	}
 
 	if m.processFilter != "" {
-		b.WriteString(styles.HelpFooter.Render("  Esc Clear  ↑/↓ Navigate  Enter Select  q Quit"))
+		b.WriteString(styles.HelpFooter.Render("  Esc Clear  [t] Toggle  ↑/↓ Navigate  Enter Select  q Quit"))
 	} else {
-		b.WriteString(styles.HelpFooter.Render("  Type to search  ↑/↓ Navigate  Enter Select  q Quit"))
+		b.WriteString(styles.HelpFooter.Render("  Type to search  [t] Toggle  ↑/↓ Navigate  Enter Select  q Quit"))
 	}
 	return b.String()
 }
