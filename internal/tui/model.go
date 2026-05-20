@@ -48,6 +48,7 @@ type Model struct {
 	showProcessPicker  bool
 	processPickerIdx   int
 	processScrollOffset int
+	processFilter      string
 
 	AppPID   int32
 	AppID    string // target app identifier from --id flag (for display when not running)
@@ -246,8 +247,8 @@ var pickerLabels = []string{"JSON", "Markdown", "HTML"}
 const processPickerMaxVisible = 12
 
 func (m *Model) handleProcessPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	procs := m.TargetSelector.Processes
-	if len(procs) == 0 {
+	procs := m.filteredProcesses()
+	if len(procs) == 0 && m.processFilter == "" {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			m.Quitting = true
@@ -276,6 +277,9 @@ func (m *Model) handleProcessPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "enter":
+		if len(procs) == 0 {
+			return m, nil
+		}
 		selected := procs[m.processPickerIdx]
 		m.AppPID = selected.PID
 		m.AppID = selected.PackageName
@@ -289,18 +293,46 @@ func (m *Model) handleProcessPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.Logs.AddEntry("INFO", "Shutting down...")
 		m.Engine.Close()
 		return m, tea.Quit
-	case "/":
-		return m, m.startFilterMode()
+	case "backspace":
+		if len(m.processFilter) > 0 {
+			m.processFilter = m.processFilter[:len(m.processFilter)-1]
+			m.processPickerIdx = 0
+			m.processScrollOffset = 0
+		}
+		return m, nil
+	case "esc":
+		if m.processFilter != "" {
+			m.processFilter = ""
+			m.processPickerIdx = 0
+			m.processScrollOffset = 0
+		}
+		return m, nil
+	}
+
+	if len(msg.String()) == 1 {
+		m.processFilter += msg.String()
+		m.processPickerIdx = 0
+		m.processScrollOffset = 0
+		return m, nil
 	}
 	return m, nil
 }
 
-type processFilterMsg struct {
-	filter string
-}
-
-func (m *Model) startFilterMode() tea.Cmd {
-	return nil
+func (m *Model) filteredProcesses() []engine.AppProcess {
+	all := m.TargetSelector.Processes
+	if m.processFilter == "" {
+		return all
+	}
+	q := strings.ToLower(m.processFilter)
+	var filtered []engine.AppProcess
+	for _, p := range all {
+		if strings.Contains(strings.ToLower(p.PackageName), q) ||
+			strings.Contains(strings.ToLower(p.Name), q) ||
+			strings.Contains(fmt.Sprintf("%d", p.PID), q) {
+			filtered = append(filtered, p)
+		}
+	}
+	return filtered
 }
 
 func (m *Model) renderProcessPicker() string {
@@ -320,14 +352,29 @@ func (m *Model) renderProcessPicker() string {
 	b.WriteString(styles.LabelStyle.Render(strings.Repeat("─", m.Width-2)))
 	b.WriteString("\n\n")
 
-	b.WriteString(styles.SubHeaderStyle.Render("  Running Processes"))
-	b.WriteString("\n\n")
+	procs := m.filteredProcesses()
 
-	procs := m.TargetSelector.Processes
-	if len(procs) == 0 {
+	if m.processFilter != "" {
+		filterLine := fmt.Sprintf("  Search: %s", m.processFilter)
+		b.WriteString(styles.HighlightStyle.Render(filterLine))
+		b.WriteString(fmt.Sprintf("  (%d/%d matches)", len(procs), len(m.TargetSelector.Processes)))
+		b.WriteString("\n\n")
+	} else {
+		b.WriteString(styles.SubHeaderStyle.Render("  Running Processes"))
+		b.WriteString("\n\n")
+	}
+
+	if len(m.TargetSelector.Processes) == 0 {
 		b.WriteString(styles.LabelStyle.Render("  No processes found. Connect a device or use --mock.\n"))
 		b.WriteString("\n")
 		b.WriteString(styles.HelpFooter.Render("  [q] Quit"))
+		return b.String()
+	}
+
+	if len(procs) == 0 {
+		b.WriteString(styles.LabelStyle.Render(fmt.Sprintf("  No matches for \"%s\"\n", m.processFilter)))
+		b.WriteString("\n")
+		b.WriteString(styles.HelpFooter.Render("  Esc to clear filter  ↑/↓ Navigate  Enter Select  q Quit"))
 		return b.String()
 	}
 
@@ -365,7 +412,11 @@ func (m *Model) renderProcessPicker() string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString(styles.HelpFooter.Render("  ↑/↓ Navigate  Enter Select  q Quit"))
+	if m.processFilter != "" {
+		b.WriteString(styles.HelpFooter.Render("  Esc Clear  ↑/↓ Navigate  Enter Select  q Quit"))
+	} else {
+		b.WriteString(styles.HelpFooter.Render("  Type to search  ↑/↓ Navigate  Enter Select  q Quit"))
+	}
 	return b.String()
 }
 
