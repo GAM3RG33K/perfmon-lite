@@ -43,8 +43,11 @@ type Model struct {
 	statusMsg  string
 	statusTime time.Time
 
-	showFormatPicker bool
-	formatPickerIdx  int
+	showFormatPicker   bool
+	formatPickerIdx    int
+	showProcessPicker  bool
+	processPickerIdx   int
+	processScrollOffset int
 
 	AppPID   int32
 	AppID    string // target app identifier from --id flag (for display when not running)
@@ -69,6 +72,11 @@ func (m *Model) Init() tea.Cmd {
 	m.Logs.AddEntry("INFO", "perfmon starting...")
 	if m.Mock {
 		m.Logs.AddEntry("INFO", "Mock mode enabled — generating simulated telemetry")
+	}
+	if m.AppPID == 0 && len(m.TargetSelector.Processes) > 0 {
+		m.showProcessPicker = true
+		m.processPickerIdx = 0
+		m.processScrollOffset = 0
 	}
 	return tea.Batch(
 		m.Engine.Start(),
@@ -143,6 +151,10 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ShowHelp = false
 		}
 		return m, nil
+	}
+
+	if m.showProcessPicker {
+		return m.handleProcessPickerKey(msg)
 	}
 
 	if m.showFormatPicker {
@@ -231,6 +243,132 @@ func (m *Model) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 var pickerFormats = []export.Format{export.FormatJSON, export.FormatMD, export.FormatHTML}
 var pickerLabels = []string{"JSON", "Markdown", "HTML"}
 
+const processPickerMaxVisible = 12
+
+func (m *Model) handleProcessPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	procs := m.TargetSelector.Processes
+	if len(procs) == 0 {
+		switch msg.String() {
+		case "q", "ctrl+c":
+			m.Quitting = true
+			m.Logs.AddEntry("INFO", "Shutting down...")
+			m.Engine.Close()
+			return m, tea.Quit
+		}
+		return m, nil
+	}
+
+	switch msg.String() {
+	case "up", "k":
+		if m.processPickerIdx > 0 {
+			m.processPickerIdx--
+			if m.processPickerIdx < m.processScrollOffset {
+				m.processScrollOffset = m.processPickerIdx
+			}
+		}
+		return m, nil
+	case "down", "j":
+		if m.processPickerIdx < len(procs)-1 {
+			m.processPickerIdx++
+			if m.processPickerIdx >= m.processScrollOffset+processPickerMaxVisible {
+				m.processScrollOffset = m.processPickerIdx - processPickerMaxVisible + 1
+			}
+		}
+		return m, nil
+	case "enter":
+		selected := procs[m.processPickerIdx]
+		m.AppPID = selected.PID
+		m.AppID = selected.PackageName
+		m.showProcessPicker = false
+		m.Engine.SetTarget(selected.PID)
+		m.Logs.AddEntry("INFO", fmt.Sprintf("Process selected: %s (PID %d)", selected.PackageName, selected.PID))
+		m.setStatus(fmt.Sprintf("Monitoring %s", selected.PackageName))
+		return m, nil
+	case "q", "ctrl+c":
+		m.Quitting = true
+		m.Logs.AddEntry("INFO", "Shutting down...")
+		m.Engine.Close()
+		return m, tea.Quit
+	case "/":
+		return m, m.startFilterMode()
+	}
+	return m, nil
+}
+
+type processFilterMsg struct {
+	filter string
+}
+
+func (m *Model) startFilterMode() tea.Cmd {
+	return nil
+}
+
+func (m *Model) renderProcessPicker() string {
+	var b strings.Builder
+
+	title := fmt.Sprintf(" perfmon v0.0.1 %s", styles.PlatformBadge(m.Platform))
+	b.WriteString(styles.TitleStyle.Render(title))
+	b.WriteString("\n")
+
+	devices := m.TargetSelector.Devices
+	if len(devices) > 0 {
+		info := fmt.Sprintf(" Target: %s  │  Select a process to monitor", devices[0].Name)
+		b.WriteString(styles.LabelStyle.Render(info))
+		b.WriteString("\n")
+	}
+
+	b.WriteString(styles.LabelStyle.Render(strings.Repeat("─", m.Width-2)))
+	b.WriteString("\n\n")
+
+	b.WriteString(styles.SubHeaderStyle.Render("  Running Processes"))
+	b.WriteString("\n\n")
+
+	procs := m.TargetSelector.Processes
+	if len(procs) == 0 {
+		b.WriteString(styles.LabelStyle.Render("  No processes found. Connect a device or use --mock.\n"))
+		b.WriteString("\n")
+		b.WriteString(styles.HelpFooter.Render("  [q] Quit"))
+		return b.String()
+	}
+
+	end := m.processScrollOffset + processPickerMaxVisible
+	if end > len(procs) {
+		end = len(procs)
+	}
+	visible := procs[m.processScrollOffset:end]
+
+	for i, p := range visible {
+		globalIdx := m.processScrollOffset + i
+		prefix := "   "
+		if globalIdx == m.processPickerIdx {
+			prefix = " ▸ "
+		}
+
+		buildBadge := styles.BuildBadge(p.BuildType)
+		line := fmt.Sprintf("%sPID %-6d %s", prefix, p.PID, p.PackageName)
+		if p.BuildType != engine.BuildUnknown {
+			line = fmt.Sprintf("%s %s", line, buildBadge)
+		}
+
+		if globalIdx == m.processPickerIdx {
+			line = styles.HighlightStyle.Render(line)
+		}
+
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	if len(procs) > processPickerMaxVisible {
+		scrollInfo := fmt.Sprintf("  %d/%d  (↑/↓ to scroll)", m.processPickerIdx+1, len(procs))
+		b.WriteString(styles.LabelStyle.Render(scrollInfo))
+		b.WriteString("\n")
+	}
+
+	b.WriteString(styles.HelpFooter.Render("  ↑/↓ Navigate  Enter Select  q Quit"))
+	return b.String()
+}
+
 func (m *Model) handleTick() (tea.Model, tea.Cmd) {
 	return m, tea.Batch(
 		func() tea.Msg { return m.Engine.Poll() },
@@ -284,6 +422,9 @@ func (m *Model) View() string {
 	}
 	if m.showFormatPicker {
 		return m.renderFormatPicker()
+	}
+	if m.showProcessPicker {
+		return m.renderProcessPicker()
 	}
 	return m.renderMainView()
 }

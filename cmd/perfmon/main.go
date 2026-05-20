@@ -132,7 +132,9 @@ func main() {
 	// ══════════════════════════════════════════════════════════════════════
 
 	eng := engine.NewEngine(provider, *bufferFlag, time.Duration(*intervalFlag)*time.Second)
-	eng.SetTarget(initialPID)
+	if initialPID > 0 {
+		eng.SetTarget(initialPID)
+	}
 
 	// ══════════════════════════════════════════════════════════════════════
 	// Export-only mode (non-interactive)
@@ -233,9 +235,16 @@ func main() {
 	model.AppID = *appIDFlag
 	model.Verbose = *verboseFlag
 
-	appName := resolvedAppName(discoveredProcesses, initialPID)
-	model.Logs.AddEntry("INFO", fmt.Sprintf("Target: %s | App: %s (PID %d)",
-		targetPlatform, appName, initialPID))
+	if initialPID > 0 {
+		appName := resolvedAppName(discoveredProcesses, initialPID)
+		model.Logs.AddEntry("INFO", fmt.Sprintf("Target: %s | App: %s (PID %d)",
+			targetPlatform, appName, initialPID))
+	} else if *appIDFlag != "" {
+		model.Logs.AddEntry("INFO", fmt.Sprintf("Target: %s | App: %s (waiting to launch)",
+			targetPlatform, *appIDFlag))
+	} else {
+		model.Logs.AddEntry("INFO", fmt.Sprintf("Target: %s | Select a process to begin", targetPlatform))
+	}
 	model.Logs.AddEntry("INFO", fmt.Sprintf("Polling every %d second(s)", *intervalFlag))
 
 	if *mockMode {
@@ -351,35 +360,10 @@ func tryAndroidProvider(adbPath string, verbose bool) (engine.TelemetryProvider,
 	}
 
 	if verbose {
-		log.Printf("Found %d processes. Scanning for user applications...", len(processes))
+		log.Printf("Found %d processes.", len(processes))
 	}
 
-	selectedProcess := selectBestProcess(processes)
-	initialPID := selectedProcess.PID
-
-	if verbose {
-		log.Printf("Selected process: %s (PID %d) [%s]",
-			selectedProcess.PackageName, selectedProcess.PID, selectedProcess.BuildType)
-	}
-
-	// Detect build type for the selected process
-	buildType, err := androidProvider.BuildType(selectedDevice.ID, selectedProcess.PackageName)
-	if err == nil {
-		selectedProcess.BuildType = buildType
-		if verbose {
-			log.Printf("Build type: %s", buildType)
-		}
-	}
-
-	// Update the process in the list with the resolved build type
-	for i := range processes {
-		if processes[i].PID == selectedProcess.PID {
-			processes[i].BuildType = buildType
-			break
-		}
-	}
-
-	return androidProvider, devices, processes, initialPID, engine.PlatformAndroid, nil
+	return androidProvider, devices, processes, 0, engine.PlatformAndroid, nil
 }
 
 // autoDetectProvider discovers the best available platform (Android → iOS → mock).
@@ -858,83 +842,7 @@ func tryiOSProvider(verbose bool) (engine.TelemetryProvider, []engine.Device, []
 		log.Printf("Found %d processes.", len(processes))
 	}
 
-	// Select the best process
-	selectedProcess := selectBestProcess(processes)
-	initialPID := selectedProcess.PID
-
-	if verbose {
-		log.Printf("Selected process: %s (PID %d) [%s]",
-			selectedProcess.PackageName, selectedProcess.PID, selectedProcess.BuildType)
-	}
-
-	// Detect build type
-	buildType, err := iOSProvider.BuildType(selectedDevice.ID, selectedProcess.PackageName)
-	if err == nil {
-		selectedProcess.BuildType = buildType
-		if verbose {
-			log.Printf("Build type: %s", buildType)
-		}
-	}
-
-	// Update the process list with resolved build type
-	for i := range processes {
-		if processes[i].PID == selectedProcess.PID {
-			processes[i].BuildType = buildType
-			break
-		}
-	}
-
-	return iOSProvider, devices, processes, initialPID, engine.PlatformIOS, nil
-}
-
-// selectBestProcess picks the most interesting process from a list of processes.
-// Preference order:
-//  1. A process whose name/package contains a dot (user app, not a system daemon)
-//  2. The first non-kernel process
-//  3. The first process overall
-func selectBestProcess(processes []engine.AppProcess) engine.AppProcess {
-	// Pass 1: real user apps — 3+ domain parts, not a known system prefix
-	var userApps []engine.AppProcess
-	for _, p := range processes {
-		name := p.PackageName
-		if strings.Count(name, ".") < 2 {
-			continue // needs at least com.example.app (3 parts)
-		}
-		// Skip known system/reserved prefixes
-		if hasAnyPrefix(name, []string{
-			"android.", "com.android.", "com.google.", "com.google.android.",
-			"com.apple.", "com.samsung.", "com.qualcomm.",
-			"media.", "system.", "zygote",
-			"UIKitApplication:com.apple.",
-		}) {
-			continue
-		}
-		userApps = append(userApps, p)
-	}
-	if len(userApps) > 0 {
-		// Prefer non-com apps (e.g. in.thetatva.tatva over com.instagram.android)
-		// since user's own apps often use custom domains
-		for _, app := range userApps {
-			if !strings.HasPrefix(app.PackageName, "com.") {
-				return app
-			}
-		}
-		return userApps[0]
-	}
-
-	// Pass 2: any process with 2+ domain parts
-	for _, p := range processes {
-		if strings.Count(p.PackageName, ".") >= 1 {
-			return p
-		}
-	}
-
-	// Fallback: first process overall
-	if len(processes) > 0 {
-		return processes[0]
-	}
-
-	return engine.AppProcess{}
+	return iOSProvider, devices, processes, 0, engine.PlatformIOS, nil
 }
 
 func hasAnyPrefix(s string, prefixes []string) bool {
